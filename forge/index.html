@@ -98,7 +98,7 @@
   .log .procs { font-size: 12px; color: var(--blue); }
   .relics h3 { margin: 10px 0 6px; font-size: 13px; color: var(--muted); font-weight: 500; }
   .chips { display: flex; flex-wrap: wrap; gap: 6px; }
-  .chip { background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; font-size: 14px; }
+  .chip { background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; font-size: 14px; font-weight: 500; color: var(--text); }
   .chip.empty { color: var(--muted); border-style: dashed; }
   .chip .st { color: var(--blue); font-size: 12px; margin-left: 4px; }
   details { margin-top: 10px; color: var(--muted); font-size: 13px; }
@@ -278,8 +278,8 @@
     renderPaper();
     renderLog();
 
-    $('relicTitle').textContent = '遺物 ' + s.relics.length + '/' + cfg.relicSlots;
-    let chips = s.relics.map(id => { const d = E.item(cfg, id); return '<span class="chip" title="' + esc(d.text) + '">' + d.name + relicState(id) + '</span>'; }).join('');
+    $('relicTitle').textContent = '遺物 ' + s.relics.length + '/' + cfg.relicSlots + '（點一下看效果，可丟棄）';
+    let chips = s.relics.map(id => { const d = E.item(cfg, id); return '<button class="chip" data-relic="' + id + '" title="' + esc(d.text) + '">' + d.name + relicState(id) + '</button>'; }).join('');
     for (let i = s.relics.length; i < cfg.relicSlots; i++) chips += '<span class="chip empty">空</span>';
     $('chips').innerHTML = chips;
 
@@ -314,7 +314,8 @@
       const d = E.item(cfg, o.id);
       const owned = s.relics.includes(o.id);
       const can = !o.sold && !owned && s.credits >= o.price;
-      const extra = '<span class="price">' + (o.sold ? '已售出' : owned ? '已持有' : '劍幣 ' + o.price + (can ? '' : '（你有 ' + s.credits + '）')) + '</span>';
+      const full = s.relics.length >= cfg.relicSlots;
+      const extra = '<span class="price">' + (o.sold ? '已售出' : owned ? '已持有' : '劍幣 ' + o.price + (can ? (full ? '・格滿，買了要丟一個' : '') : '（你有 ' + s.credits + '）')) + '</span>';
       return '<button class="card' + (o.sold || owned ? ' sold' : (can ? '' : ' cant')) + '" data-buy="' + i + '" ' + (o.sold || owned ? 'disabled' : '') + '>' + cardInner(d, extra) + '</button>';
     }).join('') || '<div class="muted">這回合沒有遺物可賣。</div>';
     const rp = E.rerollPrice(s);
@@ -425,10 +426,10 @@
 
   function renderOffer() {
     const m = $('offerModal');
-    if (!s.starterPending && !pendingPick) { m.classList.remove('on'); return; }
+    if (!s.starterPending && pendingPick == null) { m.classList.remove('on'); return; }
     m.classList.add('on');
     let html = '';
-    if (pendingPick) {
+    if (pendingPick != null) {
       const d = E.item(cfg, s.offers[pendingPick].id);
       html += '<h2>遺物格滿了</h2><div class="hint">要拿「' + d.name + '」，得丟掉一個：</div>';
       s.relics.forEach(rid => { const h = E.item(cfg, rid); html += '<button class="card drop" data-drop="' + rid + '">' + cardInner(h) + '</button>'; });
@@ -549,6 +550,11 @@
   };
   $('rackList').addEventListener('click', listClick);
   $('offeredList').addEventListener('click', listClick);
+  $('chips').addEventListener('click', ev => {
+    const b = ev.target.closest('button[data-relic]'); if (!b) return;
+    const d = E.item(cfg, b.dataset.relic);
+    if (confirm(d.name + '：' + d.text + '\n\n要丟掉這個遺物嗎？丟了不退劍幣。')) { E.removeRelic(s, b.dataset.relic); render(); }
+  });
   $('shopOffers').addEventListener('click', ev => {
     const b = ev.target.closest('button[data-buy]'); if (!b) return;
     const i = +b.dataset.buy; const r = E.buyRelic(s, i);
@@ -586,6 +592,8 @@
   renderRules();
   newGame();
   setInterval(tick, 60);
+  // 測試用：讓自動化腳本拿得到目前的局。
+  window.__forge = { get state() { return s; }, render };
 })();
 </script>
 </body>
