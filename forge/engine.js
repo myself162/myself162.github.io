@@ -119,7 +119,7 @@
   function chances(s, w, fever) {
     const grade = w ? w.grade : 0, e = w ? w.effects : null;
     let risk = w ? swordRisk(s, e) : 1.0;
-    fever = !!fever || (w && e.charge >= 10 && w.feverLeft > 0);
+    fever = !!fever || (!!w && e.charge >= 10);
     const a = [0, 0, 0, 0, 0];
     fillSwordDeck(s, grade, e, fever, a);
     if (e) {
@@ -149,28 +149,42 @@
   function ticketPaper(s, w) {
     const common = [0, 0, 0, 0, 0]; fillDeck(s, common);
     const deck = [0, 0, 0, 0, 0];
-    const fever = !!w && w.feverLeft > 0;
+    const fever = !!w && (inFever(s, w) || w.effects.charge >= 10);
     if (w) { fillSwordDeck(s, w.grade, w.effects, fever, deck); applyDeckOverride(w.effects, fever, deck); }
     else fillDeck(s, deck);
     return { deck, common, baseline: BASELINE.slice(), seal: rank(s, 'seal') > 0, grudge: rank(s, 'grudge') ? s.grudgeTickets : 0, fever };
   }
 
   // ---------- 入神 ----------
-  function feverStrikes(s) {
-    const seconds = 4 + 2 * rank(s, 'everwick') + 1 * rank(s, 'redglass');
-    const speed = 1 + 0.15 * rank(s, 'speed') + 0.3 * rank(s, 'bellows');
-    return Math.max(1, Math.floor(seconds * speed / STRIKE_SECONDS + 1e-9));
+  // 原作：每鎚間隔 0.64 秒 ÷ 速度；入神 4 秒（長芯 +2、紅漏 +1），期間破壞籤 0。
+  // 有時鐘（介面）就用真實時間；沒有（模擬器）就換算成鎚數：觸發那一鎚 + floor(秒數 × 速度 ÷ 0.64)。
+  function feverSeconds(s) { return 4 + 2 * rank(s, 'everwick') + 1 * rank(s, 'redglass'); }
+  function speedOf(s, fever) { return 1 + 0.15 * rank(s, 'speed') + (fever ? 0.3 * rank(s, 'bellows') : 0.2 * rank(s, 'loop')); }
+  function strikeInterval(s, fever) { return STRIKE_SECONDS / speedOf(s, fever); }
+  function feverStrikes(s) { return 1 + Math.max(0, Math.floor(feverSeconds(s) * speedOf(s, true) / STRIKE_SECONDS + 1e-9)); }
+  function inFever(s, w) {
+    if (!w) return false;
+    if (s.clock) return w.feverUntil > 0 && s.clock() < w.feverUntil;
+    return w.feverLeft > 0;
+  }
+  function feverRemaining(s, w) {
+    if (!w) return 0;
+    if (s.clock) return Math.max(0, w.feverUntil - s.clock());
+    return w.feverLeft;
   }
   function startFever(s, w) {
     const e = w.effects;
-    if (w.broken || e.charge < 10 || w.feverLeft > 0) return false;
-    e.charge = 0; w.feverLeft = feverStrikes(s); w.feverTotal = w.feverLeft;
+    if (w.broken || e.charge < 10 || inFever(s, w)) return false;
+    e.charge = 0;
+    if (s.clock) { w.feverUntil = s.clock() + feverSeconds(s); w.feverTotal = feverSeconds(s); w.feverLeft = 0; }
+    else { w.feverLeft = feverStrikes(s); w.feverTotal = w.feverLeft; w.feverUntil = 0; }
     e.feverStartGrade = w.grade; e.feverEndBonus = 0; e.bellowsHits = 0; e.feverActivations++;
     s.feverEvents++; s.stats.fevers++;
     return true;
   }
   function finishFever(s, w, procs) {
     const e = w.effects;
+    w.feverLeft = 0; w.feverUntil = 0;
     e.bellowsHits = 0; e.feverEndBonus = 0;
     if (!w.broken && rank(s, 'headless')) {
       const g = w.grade;
@@ -178,6 +192,16 @@
       w.value = valueOf(s, w); e.peak = Math.max(e.peak, w.value);
       e.feverEndBonus = w.grade - g;
     }
+  }
+  // 時鐘模式：時間到了就結束入神（介面每幀呼叫；敲擊前也會呼叫）。回傳 true 表示剛結束。
+  function expireFever(s) {
+    const w = anvilSword(s);
+    if (!w || !s.clock || !(w.feverUntil > 0) || s.clock() < w.feverUntil) return false;
+    const procs = [];
+    finishFever(s, w, procs);
+    procs.push({ item: 'fever', text: '入神結束', before: w.value, after: w.value });
+    pushLog(s, { kind: 'fever', outcome: 'fever', serial: w.serial, procs });
+    return true;
   }
 
   // ---------- 劍 ----------
@@ -384,6 +408,7 @@
     opts = opts || {};
     const s = {
       cfg, rng: opts.seed == null ? Math.random : mulberry32(opts.seed),
+      clock: opts.clock || null,
       phase: 'round', round: 1, misses: 0, totalMisses: 0, cleared: false, endless: false, ended: false, endReason: null, won: false,
       wallet: 0, credits: 0, goldEarned: 0, breakGoldEarned: 0,
       relics: [], offers: [], starterPending: false, shopping: false, rerolls: 0, paidRerolls: 0, freeRerollUsedRound: 0, hookUsed: false,
@@ -595,7 +620,7 @@
     const w = anvilSword(s);
     if (!w || w.broken) return { ok: false, reason: 'need sword' };
     if (w.grade >= gradeCap(s.cfg)) return { ok: false, reason: 'cap' };
-    const e = w.effects, fever = w.feverLeft > 0;
+    const e = w.effects, fever = inFever(s, w);
     if (id === 'ward') { if (fever || e.charge >= 10 || e.wardArmed) return { ok: false, reason: 'unavailable' }; e.wardArmed = true; }
     else if (id === 'chalk') { if (e.chalkArmed) return { ok: false, reason: 'already' }; e.chalkArmed = true; }
     else {
@@ -654,10 +679,11 @@
     const w = anvilSword(s);
     if (!w || w.broken) return null;
     if (w.grade >= gradeCap(s.cfg)) return null;
+    expireFever(s);
     s.undo = snapshot(s);
     const procs = [];
-    if (w.feverLeft <= 0 && startFever(s, w)) procs.push({ item: 'fever', text: '入神！接下來 ' + w.feverLeft + ' 鎚不會破壞', before: w.value, after: w.value });
-    const fever = w.feverLeft > 0;
+    if (!inFever(s, w) && startFever(s, w)) procs.push({ item: 'fever', text: s.clock ? '入神！' + feverSeconds(s) + ' 秒內不會破壞，快敲' : '入神！接下來 ' + w.feverLeft + ' 鎚不會破壞', before: w.value, after: w.value });
+    const fever = inFever(s, w);
     const ticks = chances(s, w, fever);
     const raw = rollOutcome(ticks, Math.floor(s.rng() * 1000));
     const before = w.grade, valueBefore = w.value;
@@ -670,7 +696,7 @@
       s.swords.splice(s.swords.indexOf(w), 1); s.anvil = null;
       s.ordersLeft = Math.max(0, s.ordersLeft - 1);
       if (w.value > 0) { s.delivered += w.value; s.offered.push({ serial: w.serial, grade: before, value: w.value, scrap: true }); }
-    } else if (fever) {
+    } else if (fever && !s.clock) {
       w.feverLeft--;
       if (w.feverLeft === 0) { finishFever(s, w, procs); procs.push({ item: 'fever', text: '入神結束', before: w.value, after: w.value }); }
     }
@@ -754,7 +780,8 @@
 
   return {
     OUTCOMES, LABEL, BASELINE, mulberry32, item, rank, money,
-    quota, baseQuota, valueOf, chances, ticketPaper, feverStrikes, swordSupply, pendingSwords, anvilSword, rackSwords, findSword, bestRackSword,
+    quota, baseQuota, valueOf, chances, ticketPaper, feverStrikes, feverSeconds, speedOf, strikeInterval, inFever, feverRemaining, expireFever,
+    swordSupply, pendingSwords, anvilSword, rackSwords, findSword, bestRackSword,
     newRun, beginRound, takeSword, putOnAnvil, rackAnvil, strike, deliver, takeBack, depositSword, depositCurrent, settle, nextRound, endRun,
     buyRelic, skipStarter, reroll, rerollPrice, freeRerollAvailable, removeRelic, shopOpen,
     isMerchantRound, buyMerchant, merchantRemaining, useConsumable, canRewind, rewind, summary,

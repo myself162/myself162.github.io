@@ -63,7 +63,7 @@
     }
     function forgeAI(s) {
       const w = s.weapon, e = w.effects;
-      const fever = w.feverLeft > 0;
+      const fever = E.inFever(s, w);
       const ticks = E.chances(s, w, fever), pBreak = ticks[0] / 1000;
       const q = E.quota(s), need = q - s.delivered, val = w.value, last = E.pendingSwords(s) === 0;
       if (w.strikes > 400) return E.deliver(s);

@@ -82,6 +82,7 @@
   button:disabled { opacity: .35; cursor: default; }
   button.primary { background: var(--amber); color: #2a1b06; font-size: 22px; padding: 18px 10px; }
   button.primary:active:not(:disabled) { transform: translateY(1px); filter: brightness(.95); }
+  button.primary.cooling { opacity: .55; }
   button.danger { background: #4a2a24; }
   button.small { padding: 8px 12px; font-size: 13px; font-weight: 500; }
   button.on { outline: 2px solid var(--amber); }
@@ -214,6 +215,21 @@
   const $ = id => document.getElementById(id);
   const KEY = 'forge-proto-records-v3';
   let s = null, pendingPick = null, shopOpen = false;
+  // 原作節奏：每鎚冷卻 0.64 秒 ÷ 速度；入神是真實秒數，要搶時間敲。
+  const now = () => performance.now() / 1000;
+  let nextStrikeAt = 0, strikeAllowed = false;
+  function tick() {
+    if (s && !s.ended) {
+      if (E.expireFever(s)) render();
+      const w = s.weapon;
+      if (w && E.inFever(s, w)) {
+        const fb = $('feverBar'), ft = $('feverText');
+        if (fb) fb.style.width = (100 * E.feverRemaining(s, w) / Math.max(0.01, w.feverTotal)) + '%';
+        if (ft) ft.textContent = '剩 ' + E.feverRemaining(s, w).toFixed(1) + ' 秒';
+      }
+      $('btnStrike').classList.toggle('cooling', strikeAllowed && now() < nextStrikeAt);
+    }
+  }
 
   function loadRecords() {
     try { const r = JSON.parse(localStorage.getItem(KEY)); if (r && typeof r === 'object') return r; } catch (e) {}
@@ -320,17 +336,18 @@
 
   function renderWeapon(q) {
     const w = s.weapon, el = $('weapon');
-    el.classList.toggle('fever', !!w && w.feverLeft > 0);
+    el.classList.toggle('fever', !!w && E.inFever(s, w));
     if (!w) {
       const pend = E.pendingSwords(s);
       $('weaponBody').innerHTML = '<div class="empty">鐵砧是空的。' + (pend ? '從劍架點「上鐵砧」選一把。' : '手上沒有劍了。') + '</div>';
       $('btnStrike').textContent = pend ? '鐵砧空的' : '搖鈴結算';
+      strikeAllowed = false;
       $('btnStrike').disabled = pend > 0 || !(s.phase === 'round' && !s.ended && !s.starterPending);
       $('btnDeliver').disabled = true; $('btnDeliver').textContent = '上貢';
       $('quickUse').innerHTML = E.canRewind(s) ? '<button data-use="rewind">回溯錶：撤銷上一鎚（剩 ' + s.consumables.rewind + '）</button>' : '';
       return;
     }
-    const e = w.effects, fever = w.feverLeft > 0;
+    const e = w.effects, fever = E.inFever(s, w);
     const sub = [];
     sub.push('本把最高 <b>' + money(e.peak) + ' G</b>');
     sub.push('鎚 <b>' + w.strikes + '</b>');
@@ -341,11 +358,12 @@
     if (e.starReady) sub.push('閃紋：下一鎚破壞 ×0.6');
     if (e.threadReady) sub.push('紅縷：下一鎚破壞 ×0.8');
     if (e.diceReady) sub.push('盲骰：下一鎚大成功 +3');
-    const charge = fever ? '<div class="charge"><span>入神中</span><div class="bar"><i style="width:' + (100 * w.feverLeft / Math.max(1, w.feverTotal)) + '%"></i></div><span>剩 ' + w.feverLeft + ' 鎚</span></div>'
-      : '<div class="charge"><span>充能</span><div class="bar"><i style="width:' + (10 * e.charge) + '%"></i></div><span>' + e.charge + '/10</span></div>';
+    const charge = fever ? '<div class="charge"><span>入神中</span><div class="bar"><i id="feverBar" style="width:' + (100 * E.feverRemaining(s, w) / Math.max(0.01, w.feverTotal)) + '%"></i></div><span id="feverText">剩 ' + E.feverRemaining(s, w).toFixed(1) + ' 秒</span></div>'
+      : '<div class="charge"><span>充能</span><div class="bar"><i style="width:' + (10 * e.charge) + '%"></i></div><span>' + e.charge + '/10' + (e.charge >= 10 ? '　下一鎚入神' : '') + '</span></div>';
     $('weaponBody').innerHTML = '<div class="grade"><span>+' + w.grade + '</span><small>第 ' + w.serial + ' 把</small><span class="val">' + money(w.value) + ' G</span></div><div class="sub">' + sub.join('　') + '</div>' + charge;
     $('btnStrike').textContent = '敲';
-    $('btnStrike').disabled = !(s.phase === 'round' && !s.ended && !s.starterPending) || w.grade >= cfg.maxGrade;
+    strikeAllowed = (s.phase === 'round' && !s.ended && !s.starterPending) && w.grade < cfg.maxGrade;
+    $('btnStrike').disabled = !strikeAllowed;
     $('btnDeliver').disabled = !(s.phase === 'round' && !s.ended && !s.starterPending);
     $('btnDeliver').textContent = '上貢 ' + money(w.value) + ' G';
     const uses = [];
@@ -359,7 +377,7 @@
   function renderPaper() {
     const w = s.weapon;
     const tp = E.ticketPaper(s, w);
-    const ticks = w ? E.chances(s, w, w.feverLeft > 0) : null;
+    const ticks = w ? E.chances(s, w, E.inFever(s, w)) : null;
     const total = tp.deck.reduce((a, b) => a + b, 0);
     $('total').textContent = '共 ' + Math.round(total) + ' 張' + (w ? '　破壞率依等級成長' : '');
     let rows = '';
@@ -487,15 +505,17 @@
       '上貢是把劍放進貢品窗，搖鈴前隨時可以取回。貢品總值 ≥ 配額就達標，而且全額變金幣。',
       '商店整回合都開著：遺物用劍幣（把劍投進販賣機換，1 把 1 幣），重抽用金幣（起價 15% 配額，每次 ×2.5）。商人每 3 回合來一次，賣劍（40% 配額起，每買一把 ×3）和消耗品。',
       '籤是權重，每一鎚獨立抽。籤紙上是張數；破壞籤另外乘上隨等級成長的係數，無遺物時 +4 是 25%、+10 是 47%，鐵砧上的百分比才是真實機率。',
-      '入神：每一次普通鎚擊充能 +1，滿 10 下一鎚進入入神（約 6 鎚），期間破壞籤 0。',
+      '節奏跟原作一樣：每鎚冷卻 0.64 秒（速度類遺物會縮短）。入神：每一次普通鎚擊充能 +1，滿 10 下一鎚進入入神 4 秒，期間破壞籤 0，要搶時間敲，最多 7 鎚。',
       '鍵盤：空白鍵／Enter 敲，S 上貢。',
     ].map(x => '<li>' + x + '</li>').join('');
   }
 
   function doStrike() {
     if (!s.weapon) { if (E.pendingSwords(s) === 0) doBell(); return; }
+    if (now() < nextStrikeAt) return;
     const r = E.strike(s);
     if (!r) return;
+    nextStrikeAt = now() + E.strikeInterval(s, r.inFever);
     if (r.broke) { const el = $('weapon'); el.classList.remove('broke'); void el.offsetWidth; el.classList.add('broke'); }
     render();
   }
@@ -505,7 +525,7 @@
     if (s.delivered < q && !confirm('貢品 ' + money(s.delivered) + ' 不到配額 ' + money(q) + '，搖鈴會吃一次怒氣。確定？')) return;
     E.settle(s); shopOpen = false; render();
   }
-  function newGame() { s = E.newRun(cfg); pendingPick = null; shopOpen = false; render(); }
+  function newGame() { s = E.newRun(cfg, { clock: now }); pendingPick = null; shopOpen = false; nextStrikeAt = 0; render(); }
 
   $('btnStrike').onclick = doStrike;
   $('btnDeliver').onclick = doDeliver;
@@ -555,6 +575,7 @@
 
   renderRules();
   newGame();
+  setInterval(tick, 60);
 })();
 </script>
 </body>
