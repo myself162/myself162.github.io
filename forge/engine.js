@@ -435,7 +435,6 @@
       s.swords.push(w);
       s.bestGrade = Math.max(s.bestGrade, w.grade);
     }
-    if (s.anvil == null) { const b = bestRackSword(s); if (b) putOnAnvil(s, b.serial); }
     s.phase = 'round';
   }
 
@@ -581,7 +580,6 @@
     if (o.id === 'sword') {
       const w = newSword(s, 0); w.place = 'rack'; w.heated = false; w.issuedRound = s.round; s.swords.push(w);
       s.stats.swordsBought++;
-      if (s.anvil == null) putOnAnvil(s, w.serial);
     }
     else if (o.id === 'delivery') s.deliveryBonus += 2 * o.quantity;
     else if (o.id === 'oblivion') { s.misses--; s.oblivionBought++; s.oblivionUsed++; }
@@ -647,7 +645,7 @@
     w.place = 'rack'; s.anvil = null; s.undo = null;
     return true;
   }
-  // 鐵砧空著時拿架上最高的一把。
+  // 給模擬器 AI 用：鐵砧空著時拿架上最高的一把。介面不用這個，玩家自己選。
   function takeSword(s) { if (anvilSword(s)) return false; const b = bestRackSword(s); return b ? putOnAnvil(s, b.serial) : false; }
 
   // ---------- 鍛造 ----------
