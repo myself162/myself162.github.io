@@ -378,13 +378,15 @@
   }
 
   // ---------- 一局 ----------
+  // 劍是實體：沒上貢、沒碎的劍會帶到下一回合（原作 PrepareRound preserveStored）。
+  // 放進貢品窗的劍在搖鈴前可以拿回來。鐵砧上一次一把，自己選哪一把。
   function newRun(cfg, opts) {
     opts = opts || {};
     const s = {
       cfg, rng: opts.seed == null ? Math.random : mulberry32(opts.seed),
       phase: 'round', round: 1, misses: 0, totalMisses: 0, cleared: false, endless: false, ended: false, endReason: null, won: false,
       wallet: 0, credits: 0, goldEarned: 0, breakGoldEarned: 0,
-      relics: [], offers: [], starterPending: false, rerolls: 0, paidRerolls: 0, freeRerollUsedRound: 0, hookUsed: false,
+      relics: [], offers: [], starterPending: false, shopping: false, rerolls: 0, paidRerolls: 0, freeRerollUsedRound: 0, hookUsed: false,
       merchant: null, consumables: { ward: 0, rewind: 0, chalk: 0, powder: 0, starshard: 0 },
       deliveryBonus: 0, supplyBonus: 0, supplyGrade: 0, nextSupplyGrade: 0, supplyAllGrade: 0, successfulTributes: 0, previousTributeSucceeded: true,
       funeralClaims: 0, funeralPending: 0, funeralSupplied: 0, tributeCredit: 0, nextTributeCredit: 0, insured: false, pardonTriggered: false,
@@ -392,17 +394,24 @@
       inheritGrade: 0, inheritanceChargeGrant: 0, inheritFlat: 0, inheritSuccess: 0,
       grudgeTickets: 0, mourningGreatTickets: 0, ossuaryTickets: [0, 0, 0, 0, 0], ossuarySuccessTickets: 0,
       roundOfferedGrade: 0, highestOfferedGrade: 0,
-      ordersLeft: 0, issued: 0, delivered: 0, tribute: [], weapon: null, swordSerial: 0, undo: null, lastSettle: null,
+      swords: [], offered: [], anvil: null, ordersLeft: 0, delivered: 0, swordSerial: 0, undo: null, lastSettle: null,
       bestGrade: 0, totalTribute: 0, roundsCleared: 0, score: 0, history: [], route: [], log: [],
-      stats: { strikes: 0, breaks: 0, fevers: 0, delivered: 0, deposits: 0, saves: 0, rerolls: 0, swordsBought: 0, consumablesUsed: 0, rewinds: 0 },
+      stats: { strikes: 0, breaks: 0, fevers: 0, delivered: 0, deposits: 0, saves: 0, rerolls: 0, swordsBought: 0, consumablesUsed: 0, rewinds: 0, takebacks: 0 },
     };
+    Object.defineProperty(s, 'weapon', { get() { return anvilSword(s); }, enumerable: false });
     beginRound(s);
     return s;
   }
   function pushLog(s, e) { s.log.unshift(e); if (s.log.length > 40) s.log.pop(); }
   function finishRun(s, reason) { if (s.ended) return s; s.ended = true; s.endReason = reason; s.phase = 'ended'; s.score = s.roundsCleared; return s; }
+  function inRound(s) { return s.phase === 'round' && !s.ended; }
 
   function swordSupply(s) { return 3 + rank(s, 'supply') + s.supplyBonus; }
+  function findSword(s, serial) { return s.swords.find(w => w.serial === serial) || null; }
+  function anvilSword(s) { return s.anvil == null ? null : findSword(s, s.anvil); }
+  function rackSwords(s) { return s.swords.filter(w => w.serial !== s.anvil); }
+  function pendingSwords(s) { return rackSwords(s).length; }
+  function bestRackSword(s) { return rackSwords(s).slice().sort((a, b) => b.grade - a.grade || b.value - a.value)[0] || null; }
 
   function beginRound(s) {
     s.rerolls = s.paidRerolls = 0; s.hookUsed = false;
@@ -414,20 +423,28 @@
     s.supplyGrade = Math.max(s.supplyAllGrade, s.nextSupplyGrade); s.nextSupplyGrade = 0;
     s.roundOfferedGrade = 0; s.insured = false;
     s.offers = []; s.starterPending = false;
+    s.shopping = s.round >= 2;
     if (s.round === 1) openStarterRelics(s); else generateOffers(s);
     prepareMerchantStock(s);
-    s.ordersLeft = swordSupply(s); s.issued = 0; s.delivered = 0; s.tribute = []; s.weapon = null; s.undo = null;
+    s.ordersLeft = swordSupply(s); s.delivered = 0; s.offered = []; s.undo = null;
+    for (const w of s.swords) refreshValue(s, w);
+    const supply = swordSupply(s);
+    for (let i = 0; i < supply; i++) {
+      const w = newSword(s, i === 0 ? s.supplyGrade : s.supplyAllGrade);
+      w.place = 'rack'; w.heated = false; w.issuedRound = s.round;
+      s.swords.push(w);
+      s.bestGrade = Math.max(s.bestGrade, w.grade);
+    }
+    if (s.anvil == null) { const b = bestRackSword(s); if (b) putOnAnvil(s, b.serial); }
     s.phase = 'round';
-    takeSword(s);
   }
 
   // ---------- 遺物商店 ----------
-  function shuffle(s, arr) { for (let i = arr.length - 1; i > 0; i--) { const j = Math.floor(s.rng() * (i + 1)); const t = arr[i]; arr[i] = arr[j]; arr[j] = t; } return arr; }
   function openStarterRelics(s) {
     const pool = s.cfg.starterPool.slice();
     s.offers = [];
     for (let i = 0; i < 3 && pool.length; i++) { const k = Math.min(pool.length - 1, Math.floor(s.rng() * pool.length)); s.offers.push({ id: pool[k], price: 0, sold: false }); pool.splice(k, 1); }
-    s.starterPending = true;
+    s.starterPending = true; s.shopping = true;
   }
   function offerWeight(id, round) {
     if (round >= 2 && round <= 6 && ['seal', 'rivet', 'shard', 'holy', 'repair', 'insurance'].includes(id)) return 1.75;
@@ -454,19 +471,19 @@
   }
   function freeRerollAvailable(s) { return rank(s, 'voucher') > 0 && s.freeRerollUsedRound !== s.round; }
   function rerollPrice(s) { return freeRerollAvailable(s) ? 0 : Math.ceil(Math.max(150, baseQuota(s.cfg, s.round) * 0.15) * Math.pow(2.5, s.paidRerolls)); }
-  function shopOpen(s) { return s.phase === 'round' && !s.ended && !s.starterPending; }
+  function shopOpen(s) { return inRound(s) && s.shopping && !s.starterPending; }
   function reroll(s) {
     if (s.starterPending) return { ok: false, reason: 'starter' };
     if (!shopOpen(s)) return { ok: false, reason: 'closed' };
     const price = rerollPrice(s);
     if (s.wallet < price) return { ok: false, reason: 'gold' };
     if (freeRerollAvailable(s)) s.freeRerollUsedRound = s.round; else s.paidRerolls++;
-    s.wallet -= price; s.rerolls++; s.stats.rerolls++;
+    s.wallet -= price; s.rerolls++; s.stats.rerolls++; s.undo = null;
     generateOffers(s);
     return { ok: true, price };
   }
   function buyRelic(s, index, replaceId) {
-    if (s.phase !== 'round' || s.ended) return { ok: false, reason: 'closed' };
+    if (!inRound(s) || !s.shopping) return { ok: false, reason: 'closed' };
     const o = s.offers[index];
     if (!o || o.sold) return { ok: false, reason: 'no offer' };
     if (s.relics.includes(o.id)) return { ok: false, reason: 'owned' };
@@ -476,20 +493,21 @@
       if (!replaceId || !s.relics.includes(replaceId)) return { ok: false, needReplace: true };
       removeRelic(s, replaceId); replaced = replaceId;
     }
-    s.relics.push(o.id); s.credits -= o.price; o.sold = true;
+    s.relics.push(o.id); s.credits -= o.price; o.sold = true; s.undo = null;
     for (const x of s.offers) if (x.id === o.id) x.sold = true;
-    if (s.starterPending) { s.starterPending = false; for (const x of s.offers) x.sold = true; }
+    const starter = s.starterPending;
+    if (starter) { s.starterPending = false; s.shopping = false; for (const x of s.offers) x.sold = true; }
     clearUnownedRelicProgress(s);
-    s.route.push({ round: s.round, at: s.round === 1 && o.price === 0 ? 'start' : 'shop', picked: o.id, replaced, price: o.price });
-    if (s.weapon) refreshValue(s, s.weapon);
+    s.route.push({ round: s.round, at: starter ? 'start' : 'shop', picked: o.id, replaced, price: o.price });
+    for (const w of s.swords) refreshValue(s, w);
     return { ok: true, picked: o.id, replaced };
   }
-  function skipStarter(s) { if (!s.starterPending) return false; s.starterPending = false; for (const x of s.offers) x.sold = true; s.route.push({ round: 1, at: 'start', picked: null, replaced: null, price: 0 }); return true; }
+  function skipStarter(s) { if (!s.starterPending) return false; s.starterPending = false; s.shopping = false; for (const x of s.offers) x.sold = true; s.route.push({ round: 1, at: 'start', picked: null, replaced: null, price: 0 }); return true; }
   function removeRelic(s, id) {
     if (s.ended || !s.relics.includes(id)) return false;
     s.relics.splice(s.relics.indexOf(id), 1);
     clearUnownedRelicProgress(s);
-    if (s.weapon) refreshValue(s, s.weapon);
+    for (const w of s.swords) refreshValue(s, w);
     return true;
   }
   function clearUnownedRelicProgress(s) {
@@ -498,21 +516,24 @@
     if (!rank(s, 'tooth')) { s.inheritFlat = 0; s.inheritSuccess = 0; }
     if (!rank(s, 'collector')) s.taxSuccesses = 0;
   }
-  // 販賣機：把鐵砧上的劍投進去換劍幣。
+  // 販賣機：任何一把劍投進去換劍幣（討債鉤：重抽後第一把沒敲過的 +0 劍給 2 枚）。
   function depositCredit(s, w) {
     let n = 1;
     if (rank(s, 'hook') && s.rerolls > 0 && !s.hookUsed && w.grade === 0 && w.strikes === 0) { n = 2; s.hookUsed = true; }
     s.credits += n; return n;
   }
-  function depositCurrent(s) {
-    if (s.phase !== 'round' || s.ended || !s.weapon || s.weapon.broken) return null;
-    const w = s.weapon;
+  function depositSword(s, serial) {
+    if (!inRound(s)) return null;
+    const w = serial == null ? anvilSword(s) : findSword(s, serial);
+    if (!w || w.broken) return null;
     const n = depositCredit(s, w);
-    s.ordersLeft = Math.max(0, s.ordersLeft - 1); s.stats.deposits++;
+    s.swords.splice(s.swords.indexOf(w), 1);
+    if (s.anvil === w.serial) s.anvil = null;
+    s.ordersLeft = Math.max(0, s.ordersLeft - 1); s.stats.deposits++; s.undo = null;
     pushLog(s, { kind: 'deposit', outcome: 'deposit', before: w.grade, credits: n, serial: w.serial, procs: [] });
-    s.weapon = null; s.undo = null;
     return { credits: n };
   }
+  function depositCurrent(s) { return depositSword(s, null); }
 
   // ---------- 商人（3 的倍數回合） ----------
   function isMerchantRound(r) { return r >= 3 && r % 3 === 0; }
@@ -549,15 +570,19 @@
   }
   function merchantRemaining(o) { return o.sold ? 0 : Math.max(0, Math.max(1, o.stock) - o.purchases); }
   function buyMerchant(s, index) {
-    if (s.phase !== 'round' || s.ended || !s.merchant) return { ok: false, reason: 'closed' };
+    if (!inRound(s) || !s.merchant) return { ok: false, reason: 'closed' };
     const o = s.merchant.offers[index];
     if (!o || merchantRemaining(o) <= 0) return { ok: false, reason: 'sold out' };
     if (o.id === 'oblivion' && (s.oblivionBought > 0 || s.oblivionUsed > 0 || s.misses <= 0 || s.misses >= 3)) return { ok: false, reason: 'unavailable' };
     if (s.wallet < o.price) return { ok: false, reason: 'gold' };
     const price = o.price;
-    s.wallet -= price; o.purchases++; o.sold = o.purchases >= Math.max(1, o.stock);
+    s.wallet -= price; o.purchases++; o.sold = o.purchases >= Math.max(1, o.stock); s.undo = null;
     if (!o.sold) o.price = Math.ceil(o.firstPrice * Math.pow(3, o.purchases) / 10) * 10;
-    if (o.id === 'sword') { s.ordersLeft++; s.stats.swordsBought++; if (!s.weapon) takeSword(s); }
+    if (o.id === 'sword') {
+      const w = newSword(s, 0); w.place = 'rack'; w.heated = false; w.issuedRound = s.round; s.swords.push(w);
+      s.stats.swordsBought++;
+      if (s.anvil == null) putOnAnvil(s, w.serial);
+    }
     else if (o.id === 'delivery') s.deliveryBonus += 2 * o.quantity;
     else if (o.id === 'oblivion') { s.misses--; s.oblivionBought++; s.oblivionUsed++; }
     else s.consumables[o.id] = (s.consumables[o.id] || 0) + o.quantity;
@@ -566,10 +591,10 @@
 
   // ---------- 消耗品 ----------
   function useConsumable(s, id) {
-    if (s.phase !== 'round' || s.ended) return { ok: false, reason: 'closed' };
+    if (!inRound(s)) return { ok: false, reason: 'closed' };
     if (id === 'rewind') return rewind(s);
     if (!s.consumables[id]) return { ok: false, reason: 'none' };
-    const w = s.weapon;
+    const w = anvilSword(s);
     if (!w || w.broken) return { ok: false, reason: 'need sword' };
     if (w.grade >= gradeCap(s.cfg)) return { ok: false, reason: 'cap' };
     const e = w.effects, fever = w.feverLeft > 0;
@@ -586,41 +611,50 @@
     return { ok: true };
   }
 
-  // ---------- 回溯（原作 rewind：只能撤銷上一鎚，離開鐵砧前有效；不還原亂數） ----------
-  const SHARED_KEYS = ['insured', 'grudgeTickets', 'ossuaryTickets', 'inheritGrade', 'inheritanceChargeGrant', 'inheritFlat', 'inheritSuccess', 'brokenSwords', 'funeralClaims', 'funeralPending', 'wallet', 'goldEarned', 'breakGoldEarned', 'damageEvents', 'holdEvents', 'greatEvents', 'feverEvents', 'delivered', 'ordersLeft', 'bestGrade', 'totalTribute'];
+  // ---------- 回溯（原作 rewind：只能撤銷上一鎚，離開鐵砧或買東西就失效；不還原亂數） ----------
+  const SHARED_KEYS = ['insured', 'grudgeTickets', 'ossuaryTickets', 'inheritGrade', 'inheritanceChargeGrant', 'inheritFlat', 'inheritSuccess', 'brokenSwords', 'funeralClaims', 'funeralPending', 'wallet', 'goldEarned', 'breakGoldEarned', 'damageEvents', 'holdEvents', 'greatEvents', 'feverEvents', 'delivered', 'ordersLeft', 'bestGrade', 'anvil'];
   function snapshot(s) {
     const shared = {}; for (const k of SHARED_KEYS) shared[k] = JSON.parse(JSON.stringify(s[k]));
-    return { weapon: JSON.parse(JSON.stringify(s.weapon)), shared, tributeLen: s.tribute.length, stats: JSON.parse(JSON.stringify(s.stats)) };
+    return { serial: s.anvil, swords: JSON.parse(JSON.stringify(s.swords)), offered: JSON.parse(JSON.stringify(s.offered)), shared, stats: JSON.parse(JSON.stringify(s.stats)) };
   }
   function canRewind(s) {
-    return s.phase === 'round' && !s.ended && s.consumables.rewind > 0 && !!s.undo && (s.weapon == null || s.weapon.serial === s.undo.weapon.serial) && s.wallet >= Math.max(0, s.breakGoldEarned - s.undo.shared.breakGoldEarned);
+    return inRound(s) && s.consumables.rewind > 0 && !!s.undo && (s.anvil == null || s.anvil === s.undo.serial) && s.wallet >= Math.max(0, s.breakGoldEarned - s.undo.shared.breakGoldEarned);
   }
   function rewind(s) {
     if (!canRewind(s)) return { ok: false, reason: 'cannot' };
     const u = s.undo; s.undo = null;
     for (const k of SHARED_KEYS) s[k] = u.shared[k];
-    s.weapon = u.weapon; s.tribute = s.tribute.slice(0, u.tributeLen); s.stats = u.stats;
+    s.swords = u.swords; s.offered = u.offered; s.stats = u.stats;
     s.consumables.rewind--; s.stats.rewinds++;
-    pushLog(s, { kind: 'rewind', outcome: 'rewind', serial: s.weapon.serial, procs: [] });
+    pushLog(s, { kind: 'rewind', outcome: 'rewind', serial: u.serial, procs: [] });
     return { ok: true };
   }
 
-  // ---------- 鍛造 ----------
-  function takeSword(s) {
-    if (s.phase !== 'round' || s.ended || s.weapon) return false;
-    if (s.ordersLeft <= 0) return false;
-    const g = s.issued === 0 ? s.supplyGrade : s.supplyAllGrade;
-    s.issued++;
-    s.weapon = newSword(s, g);
-    s.bestGrade = Math.max(s.bestGrade, s.weapon.grade);
-    s.undo = null;
+  // ---------- 劍的移動 ----------
+  function putOnAnvil(s, serial) {
+    if (!inRound(s)) return false;
+    const w = findSword(s, serial);
+    if (!w || w.broken) return false;
+    if (s.anvil === serial) return true;
+    const prev = anvilSword(s);
+    if (prev) prev.place = 'rack';
+    w.place = 'anvil'; w.heated = true; s.anvil = serial; s.undo = null;
     return true;
   }
-  function pendingSwords(s) { return Math.max(0, s.ordersLeft - (s.weapon ? 1 : 0)); }
+  function rackAnvil(s) {
+    const w = anvilSword(s);
+    if (!w) return false;
+    w.place = 'rack'; s.anvil = null; s.undo = null;
+    return true;
+  }
+  // 鐵砧空著時拿架上最高的一把。
+  function takeSword(s) { if (anvilSword(s)) return false; const b = bestRackSword(s); return b ? putOnAnvil(s, b.serial) : false; }
 
+  // ---------- 鍛造 ----------
   function strike(s) {
-    if (s.phase !== 'round' || s.ended || !s.weapon || s.weapon.broken || s.starterPending) return null;
-    const w = s.weapon;
+    if (!inRound(s) || s.starterPending) return null;
+    const w = anvilSword(s);
+    if (!w || w.broken) return null;
     if (w.grade >= gradeCap(s.cfg)) return null;
     s.undo = snapshot(s);
     const procs = [];
@@ -635,36 +669,50 @@
     if (raw === 'break' && !w.broken) shown = 'saved';
     if (!w.broken) s.bestGrade = Math.max(s.bestGrade, w.grade);
     if (w.broken) {
-      s.delivered += w.value; s.totalTribute += 0;
-      if (w.value > 0) s.tribute.push({ grade: before, value: w.value, scrap: true, serial: w.serial });
+      s.swords.splice(s.swords.indexOf(w), 1); s.anvil = null;
       s.ordersLeft = Math.max(0, s.ordersLeft - 1);
+      if (w.value > 0) { s.delivered += w.value; s.offered.push({ serial: w.serial, grade: before, value: w.value, scrap: true }); }
     } else if (fever) {
       w.feverLeft--;
       if (w.feverLeft === 0) { finishFever(s, w, procs); procs.push({ item: 'fever', text: '入神結束', before: w.value, after: w.value }); }
     }
     const result = { kind: 'strike', raw, outcome: shown, before, after: w.broken ? null : w.grade, valueBefore, valueAfter: w.value, broke: w.broken, inFever: fever, procs: procs.filter(p => p.item !== ''), ticks, serial: w.serial };
     pushLog(s, result);
-    if (w.broken) s.weapon = null;
     return result;
   }
 
-  function deliver(s) {
-    if (s.phase !== 'round' || s.ended || !s.weapon || s.weapon.broken) return null;
-    const w = s.weapon;
-    s.delivered += w.value; s.ordersLeft = Math.max(0, s.ordersLeft - 1); s.stats.delivered++;
+  // 上貢：把劍放進貢品窗（搖鈴前可以拿回來）。
+  function deliver(s, serial) {
+    if (!inRound(s)) return null;
+    const w = serial == null ? anvilSword(s) : findSword(s, serial);
+    if (!w || w.broken) return null;
+    s.swords.splice(s.swords.indexOf(w), 1);
+    if (s.anvil === w.serial) s.anvil = null;
+    w.place = 'tribute';
+    s.offered.push(w);
+    s.delivered += w.value; s.ordersLeft = Math.max(0, s.ordersLeft - 1); s.stats.delivered++; s.undo = null;
     s.roundOfferedGrade = Math.max(s.roundOfferedGrade, w.grade); s.highestOfferedGrade = Math.max(s.highestOfferedGrade, w.grade);
-    s.tribute.push({ grade: w.grade, value: w.value, serial: w.serial });
     pushLog(s, { kind: 'deliver', outcome: 'deliver', before: w.grade, value: w.value, serial: w.serial, procs: [] });
-    s.weapon = null; s.undo = null;
+    return { grade: w.grade, value: w.value };
+  }
+  function takeBack(s, serial) {
+    if (!inRound(s)) return null;
+    const w = s.offered.find(x => x.serial === serial && !x.scrap);
+    if (!w) return null;
+    s.offered.splice(s.offered.indexOf(w), 1);
+    s.delivered = Math.max(0, s.delivered - w.value); s.ordersLeft++; s.stats.takebacks++; s.undo = null;
+    w.place = 'rack'; s.swords.push(w);
+    s.roundOfferedGrade = s.offered.reduce((m, x) => x.scrap ? m : Math.max(m, x.grade), 0);
+    pushLog(s, { kind: 'takeback', outcome: 'takeback', before: w.grade, value: w.value, serial: w.serial, procs: [] });
     return { grade: w.grade, value: w.value };
   }
 
   // ---------- 結算（搖鈴） ----------
   function settle(s) {
-    if (s.phase !== 'round' || s.ended) return null;
+    if (!inRound(s)) return null;
     const q = quota(s), tribute = s.delivered;
     const won = tribute >= q;
-    const wasted = pendingSwords(s) + (s.weapon && !s.weapon.broken ? 1 : 0);
+    const carried = s.swords.length;
     if (won && s.endless) s.endlessPaidTributes = (s.endlessPaidTributes || 0) + 1;
     if (rank(s, 'royalchange')) s.nextTributeCredit = round0(Math.min(Math.max(0, tribute - q) * 0.3, baseQuota(s.cfg, s.round + 1) * (rank(s, 'letter') ? 0.9 : 1.0) * 0.3));
     if (!won) { s.misses++; s.totalMisses++; if (rank(s, 'mourning')) s.mourningGreatTickets = inc(s.mourningGreatTickets); }
@@ -679,10 +727,10 @@
     if (dead && rank(s, 'dragonpardon')) { s.relics.splice(s.relics.indexOf('dragonpardon'), 1); s.misses = 2; dead = false; s.pardonTriggered = true; }
     if (deadline) s.cleared = !dead;
     s.previousTributeSucceeded = won;
-    s.lastSettle = { round: s.round, quota: q, tribute, passed: won, gold: Math.max(0, tribute), wasted, misses: s.misses, items: s.tribute.slice(), contractDone: deadline && !dead, pardon: s.pardonTriggered, credit: s.nextTributeCredit };
+    s.lastSettle = { round: s.round, quota: q, tribute, passed: won, gold: Math.max(0, tribute), carried, misses: s.misses, items: s.offered.map(x => ({ grade: x.grade, value: x.value, scrap: !!x.scrap })), contractDone: deadline && !dead, pardon: s.pardonTriggered, credit: s.nextTributeCredit };
     s.history.push({ round: s.round, quota: q, tribute, passed: won, best: s.roundOfferedGrade });
     pushLog(s, { kind: 'settle', outcome: 'settle', round: s.round, quota: q, tribute, passed: won, procs: [] });
-    s.weapon = null; s.undo = null; s.ordersLeft = 0; s.merchant = null;
+    s.offered = []; s.undo = null; s.merchant = null; s.shopping = false;
     s.phase = 'settle';
     if (dead) finishRun(s, 'misses');
     return s.lastSettle;
@@ -699,8 +747,8 @@
   function summary(s) {
     return {
       score: s.roundsCleared, round: s.round, roundsCleared: s.roundsCleared, cleared: s.cleared, endless: s.endless, misses: s.misses, endReason: s.endReason,
-      totalTribute: s.totalTribute, bestGrade: s.bestGrade, wallet: s.wallet,
-      strikes: s.stats.strikes, breaks: s.stats.breaks, fevers: s.stats.fevers, delivered: s.stats.delivered, deposits: s.stats.deposits,
+      totalTribute: s.totalTribute, bestGrade: s.bestGrade, wallet: s.wallet, swordsLeft: s.swords.length,
+      strikes: s.stats.strikes, breaks: s.stats.breaks, fevers: s.stats.fevers, delivered: s.stats.delivered, deposits: s.stats.deposits, takebacks: s.stats.takebacks,
       rerolls: s.stats.rerolls, swordsBought: s.stats.swordsBought, consumablesUsed: s.stats.consumablesUsed, rewinds: s.stats.rewinds,
       relics: s.relics.slice(), route: s.route.slice(), history: s.history.slice(),
     };
@@ -708,8 +756,8 @@
 
   return {
     OUTCOMES, LABEL, BASELINE, mulberry32, item, rank, money,
-    quota, baseQuota, valueOf, chances, ticketPaper, feverStrikes, swordSupply, pendingSwords,
-    newRun, beginRound, takeSword, strike, deliver, depositCurrent, settle, nextRound, endRun,
+    quota, baseQuota, valueOf, chances, ticketPaper, feverStrikes, swordSupply, pendingSwords, anvilSword, rackSwords, findSword, bestRackSword,
+    newRun, beginRound, takeSword, putOnAnvil, rackAnvil, strike, deliver, takeBack, depositSword, depositCurrent, settle, nextRound, endRun,
     buyRelic, skipStarter, reroll, rerollPrice, freeRerollAvailable, removeRelic, shopOpen,
     isMerchantRound, buyMerchant, merchantRemaining, useConsumable, canRewind, rewind, summary,
   };

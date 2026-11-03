@@ -43,7 +43,7 @@
       let idx = wantedIndex(s);
       if (idx >= 0) {
         const o = s.offers[idx];
-        while (s.credits < o.price && s.ordersLeft > 2 && s.weapon && s.weapon.strikes === 0) { E.depositCurrent(s); E.takeSword(s); }
+        while (s.credits < o.price && s.swords.length > 2 && s.weapon && s.weapon.strikes === 0) { E.depositCurrent(s); E.takeSword(s); }
         if (s.credits >= o.price) buyWithReplace(s, idx);
       }
       if (PICK === 'build' && wantedIndex(s) < 0 && s.relics.length < cfg.relicSlots && s.wallet >= E.rerollPrice(s) * 3 && E.rerollPrice(s) > 0) {
@@ -54,7 +54,7 @@
       if (s.merchant) {
         const offers = s.merchant.offers;
         const si = offers.findIndex(o => o.id === 'sword');
-        while (si >= 0 && E.merchantRemaining(offers[si]) > 0 && s.wallet >= offers[si].price && s.ordersLeft < 4) { if (!E.buyMerchant(s, si).ok) break; }
+        while (si >= 0 && E.merchantRemaining(offers[si]) > 0 && s.wallet >= offers[si].price && s.swords.length < 4) { if (!E.buyMerchant(s, si).ok) break; }
         const wi = offers.findIndex(o => o.id === 'ward');
         if (wi >= 0 && E.merchantRemaining(offers[wi]) > 0 && s.wallet >= offers[wi].price * 2) E.buyMerchant(s, wi);
         const ri = offers.findIndex(o => o.id === 'rewind');
@@ -87,7 +87,7 @@
         if (s.starterPending) { pickStarter(s); continue; }
         if (shopRound !== s.round) { shopRound = s.round; shopAI(s); continue; }
         if (!s.weapon) {
-          if (E.canRewind(s) && s.undo && s.undo.weapon && s.undo.weapon.grade >= 8) { E.rewind(s); continue; }
+          if (E.canRewind(s) && s.undo) { const u = s.undo.swords.find(w => w.serial === s.undo.serial); if (u && u.grade >= 8) { E.rewind(s); continue; } }
           if (E.pendingSwords(s) > 0) { E.takeSword(s); continue; }
           E.settle(s); continue;
         }

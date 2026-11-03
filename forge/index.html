@@ -37,6 +37,14 @@
   .tchips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
   .tchips span { background: var(--panel2); border-radius: 6px; padding: 2px 8px; font-size: 12px; }
   .tchips span.scrap { color: var(--muted); }
+  .list { margin-top: 6px; }
+  .list .h { font-size: 12px; color: var(--muted); margin: 6px 0 2px; }
+  .list .it { display: flex; align-items: center; gap: 6px; padding: 4px 0; border-top: 1px solid var(--line); font-size: 14px; }
+  .list .it .g { font-weight: 700; min-width: 40px; }
+  .list .it .v { color: var(--gold); flex: 1; }
+  .list .it .m { color: var(--muted); font-size: 12px; }
+  .list .it button { padding: 6px 9px; font-size: 12px; font-weight: 500; border-radius: 8px; }
+  .list .it.scrap { color: var(--muted); }
   .topbtns { display: flex; gap: 8px; margin-top: 8px; }
   .topbtns button { flex: 1; padding: 10px; font-size: 14px; }
   .weapon { margin-top: 8px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; }
@@ -144,7 +152,8 @@
     <div class="t"><span>貢品 <b id="tribute">0</b></span><span>配額 <b id="quota">0</b></span></div>
     <div class="bar"><i id="quotaBar"></i></div>
     <div class="swords" id="swords"></div>
-    <div class="tchips" id="tchips"></div>
+    <div class="list" id="offeredList"></div>
+    <div class="list" id="rackList"></div>
     <div class="topbtns">
       <button id="btnShop">商店</button>
       <button class="danger" id="btnBell">搖鈴結算</button>
@@ -233,13 +242,14 @@
     $('tribute').textContent = money(s.delivered);
     $('quota').textContent = money(q);
     const bar = $('quotaBar'); bar.style.width = Math.min(100, 100 * s.delivered / Math.max(1, q)) + '%'; bar.classList.toggle('under', s.delivered < q);
-    const need = q - s.delivered, pend = E.pendingSwords(s);
-    $('swords').innerHTML = '鐵砧 <b>' + (s.weapon ? '1' : '0') + '</b> 把，架上 <b>' + pend + '</b> 把　' + (need > 0 ? '還差 <b>' + money(need) + '</b>' : '<span style="color:var(--green)">已達標</span>，多的都是金幣') + (E.isMerchantRound(s.round) && s.merchant ? '　<span style="color:var(--gold)">商人來了</span>' : '');
-    $('tchips').innerHTML = s.tribute.map(x => '<span' + (x.scrap ? ' class="scrap"' : '') + '>' + (x.scrap ? '廢鐵 ' : '+' + x.grade + '　') + money(x.value) + '</span>').join('');
+    const need = q - s.delivered, rack = E.rackSwords(s), total = s.swords.length;
+    $('swords').innerHTML = '手上共 <b>' + total + '</b> 把劍（鐵砧 ' + (s.weapon ? 1 : 0) + '，架上 ' + rack.length + '）　' + (need > 0 ? '還差 <b>' + money(need) + '</b>' : '<span style="color:var(--green)">已達標</span>，多的都是金幣') + (E.isMerchantRound(s.round) && s.merchant ? '　<span style="color:var(--gold)">商人來了</span>' : '');
+    $('offeredList').innerHTML = s.offered.length ? '<div class="h">貢品窗（搖鈴前可取回）</div>' + s.offered.map(x => '<div class="it' + (x.scrap ? ' scrap' : '') + '"><span class="g">' + (x.scrap ? '廢鐵' : '+' + x.grade) + '</span><span class="v">' + money(x.value) + ' G</span>' + (x.scrap ? '' : '<button data-takeback="' + x.serial + '">取回</button>') + '</div>').join('') : '';
+    $('rackList').innerHTML = rack.length ? '<div class="h">劍架（沒上貢的劍會帶到下一回合）</div>' + rack.slice().sort((a, b) => b.grade - a.grade).map(w => '<div class="it"><span class="g">+' + w.grade + '</span><span class="v">' + money(w.value) + ' G</span><span class="m">' + (w.strikes ? '鎚 ' + w.strikes + '・充能 ' + w.effects.charge : '新') + (w.issuedRound < s.round ? '・R' + w.issuedRound : '') + '</span><button data-anvil="' + w.serial + '">上鐵砧</button><button data-deliver="' + w.serial + '">上貢</button><button data-deposit="' + w.serial + '">投入</button></div>').join('') : '';
     $('btnShop').disabled = !inRound || s.starterPending;
     $('btnShop').classList.toggle('on', shopOpen);
     $('btnBell').disabled = !inRound || s.starterPending;
-    $('btnBell').textContent = (pend === 0 && !s.weapon) ? '搖鈴結算' : '搖鈴結算（還有 ' + (pend + (s.weapon ? 1 : 0)) + ' 把）';
+    $('btnBell').textContent = total === 0 ? '搖鈴結算' : '搖鈴結算（' + total + ' 把留到下回合）';
 
     $('shopPanel').classList.toggle('hide', !shopOpen || !inRound);
     if (shopOpen && inRound) renderShop();
@@ -313,8 +323,8 @@
     el.classList.toggle('fever', !!w && w.feverLeft > 0);
     if (!w) {
       const pend = E.pendingSwords(s);
-      $('weaponBody').innerHTML = '<div class="empty">鐵砧是空的。' + (pend ? '架上還有 ' + pend + ' 把。' : '這回合的劍用完了。') + '</div>';
-      $('btnStrike').textContent = pend ? '拿下一把' : '搖鈴結算';
+      $('weaponBody').innerHTML = '<div class="empty">鐵砧是空的。' + (pend ? '架上還有 ' + pend + ' 把，點劍架的「上鐵砧」或直接拿最高的。' : '手上沒有劍了。') + '</div>';
+      $('btnStrike').textContent = pend ? '拿最高的一把' : '搖鈴結算';
       $('btnStrike').disabled = !(s.phase === 'round' && !s.ended && !s.starterPending);
       $('btnDeliver').disabled = true; $('btnDeliver').textContent = '上貢';
       $('quickUse').innerHTML = E.canRewind(s) ? '<button data-use="rewind">回溯錶：撤銷上一鎚（剩 ' + s.consumables.rewind + '）</button>' : '';
@@ -341,7 +351,8 @@
     const uses = [];
     for (const id of ['ward', 'chalk', 'powder', 'starshard']) if (s.consumables[id] > 0) uses.push('<button data-use="' + id + '">' + name(id) + ' ×' + s.consumables[id] + '</button>');
     if (E.canRewind(s)) uses.push('<button data-use="rewind">回溯錶 ×' + s.consumables.rewind + '</button>');
-    uses.push('<button data-deposit="1" ' + (s.phase !== 'round' ? 'disabled' : '') + '>投入販賣機 +1 劍幣</button>');
+    uses.push('<button data-rack="1">放回架上</button>');
+    uses.push('<button data-depositcur="1">投入販賣機 +1 劍幣</button>');
     $('quickUse').innerHTML = uses.join('');
   }
 
@@ -380,6 +391,7 @@
       if (e.kind === 'deliver') d = '<b>+' + e.before + '</b> 上貢 <b>' + money(e.value) + '</b> G';
       else if (e.kind === 'deposit') d = '投入販賣機，劍幣 +' + e.credits;
       else if (e.kind === 'use') d = '使用 ' + name(e.id);
+      else if (e.kind === 'takeback') d = '從貢品窗取回 <b>+' + e.before + '</b>';
       else if (e.kind === 'rewind') d = '撤銷上一鎚';
       else if (e.broke) d = '<b>+' + e.before + '</b> 碎了' + (e.valueAfter > 0 ? '，廢鐵 ' + money(e.valueAfter) + ' G' : '');
       else d = '+' + e.before + ' → <b>+' + e.after + '</b>　' + money(e.valueAfter) + ' G' + (e.inFever ? '　<span class="muted">入神</span>' : '');
@@ -419,7 +431,7 @@
       (L.pardon ? '<div class="new">赦狀擋下了一次死亡。</div>' : '') +
       '<dl><dt>貢品</dt><dd>' + (L.items.map(x => (x.scrap ? '廢鐵' : '+' + x.grade) + '（' + money(x.value) + '）').join('、') || '無') + '</dd>' +
       '<dt>金幣</dt><dd>+' + money(L.gold) + '</dd>' +
-      (L.wasted ? '<dt>作廢的劍</dt><dd>' + L.wasted + ' 把（沒上貢也沒投入）</dd>' : '') +
+      (L.carried ? '<dt>帶到下回合</dt><dd>' + L.carried + ' 把劍</dd>' : '') +
       (L.credit ? '<dt>下回合抵扣</dt><dd>' + money(L.credit) + '</dd>' : '') +
       '<dt>怒氣</dt><dd>' + L.misses + ' / 3' + (L.passed ? '' : '　<span style="color:var(--red)">+1</span>') + '</dd></dl>' +
       '<button class="primary" id="btnNext" style="width:100%">第 ' + (s.round + 1) + ' 回合　配額 ' + money(nextQ) + '</button>';
@@ -471,8 +483,8 @@
   function renderRules() {
     $('rules').innerHTML = [
       '一局是連續回合。契約 ' + cfg.contractRound + ' 回合，達標後怒氣歸零進無盡。上貢不足累計 3 次，局結束。分數 = 達標回合數。',
-      '每回合供 3 把劍，鎚數不限。劍碎了鐵砧就空著，自己拿下一把。上貢：劍進貢品堆，價值 = 320 × 1.5^等級，大成功時價值跳 ×2.5。',
-      '貢品總值 ≥ 配額就達標，而且全額變金幣。搖鈴時沒上貢也沒投入的劍直接作廢。',
+      '每回合發 3 把劍，鎚數不限。劍是實體：沒上貢、沒碎的劍會帶到下一回合，可以跨回合專養一把。鐵砧一次一把，自己選。價值 = 320 × 1.5^等級，大成功時價值跳 ×2.5。',
+      '上貢是把劍放進貢品窗，搖鈴前隨時可以取回。貢品總值 ≥ 配額就達標，而且全額變金幣。',
       '商店整回合都開著：遺物用劍幣（把劍投進販賣機換，1 把 1 幣），重抽用金幣（起價 15% 配額，每次 ×2.5）。商人每 3 回合來一次，賣劍（40% 配額起，每買一把 ×3）和消耗品。',
       '籤是權重，每一鎚獨立抽。籤紙上是張數；破壞籤另外乘上隨等級成長的係數，無遺物時 +4 是 25%、+10 是 47%，鐵砧上的百分比才是真實機率。',
       '入神：每一次普通鎚擊充能 +1，滿 10 下一鎚進入入神（約 6 鎚），期間破壞籤 0。',
@@ -489,8 +501,8 @@
   }
   function doDeliver() { if (E.deliver(s)) render(); }
   function doBell() {
-    const left = E.pendingSwords(s) + (s.weapon ? 1 : 0);
-    if (left > 0 && !confirm('還有 ' + left + ' 把劍沒處理，搖鈴後會作廢。確定結算？')) return;
+    const q = E.quota(s);
+    if (s.delivered < q && !confirm('貢品 ' + money(s.delivered) + ' 不到配額 ' + money(q) + '，搖鈴會吃一次怒氣。確定？')) return;
     E.settle(s); shopOpen = false; render();
   }
   function newGame() { s = E.newRun(cfg); pendingPick = null; shopOpen = false; render(); }
@@ -501,6 +513,17 @@
   $('btnShop').onclick = () => { shopOpen = !shopOpen; render(); };
   $('btnReroll').onclick = () => { E.reroll(s); render(); };
   $('btnDeposit').onclick = () => { if (E.depositCurrent(s)) { E.takeSword(s); render(); } };
+  const listClick = ev => {
+    const b = ev.target.closest('button'); if (!b) return;
+    if (b.dataset.anvil) E.putOnAnvil(s, +b.dataset.anvil);
+    else if (b.dataset.deliver) E.deliver(s, +b.dataset.deliver);
+    else if (b.dataset.deposit) E.depositSword(s, +b.dataset.deposit);
+    else if (b.dataset.takeback) E.takeBack(s, +b.dataset.takeback);
+    else return;
+    render();
+  };
+  $('rackList').addEventListener('click', listClick);
+  $('offeredList').addEventListener('click', listClick);
   $('shopOffers').addEventListener('click', ev => {
     const b = ev.target.closest('button[data-buy]'); if (!b) return;
     const i = +b.dataset.buy; const r = E.buyRelic(s, i);
@@ -514,7 +537,8 @@
   $('quickUse').addEventListener('click', ev => {
     const b = ev.target.closest('button'); if (!b) return;
     if (b.dataset.use) { E.useConsumable(s, b.dataset.use); render(); }
-    else if (b.dataset.deposit) { if (E.depositCurrent(s)) { E.takeSword(s); render(); } }
+    else if (b.dataset.depositcur) { if (E.depositCurrent(s)) { E.takeSword(s); render(); } }
+    else if (b.dataset.rack) { E.rackAnvil(s); render(); }
   });
   $('offerSheet').addEventListener('click', ev => {
     const b = ev.target.closest('button'); if (!b) return;
