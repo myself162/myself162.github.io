@@ -20,12 +20,12 @@
 <div class="wrap">
   <h1>鍛造原型 模擬器</h1>
   <form id="f" onsubmit="return false">
-    <div><label>局數</label><input id="runs" type="number" value="3000" min="100" step="100"></div>
+    <div><label>局數</label><input id="runs" type="number" value="1000" min="100" step="100"></div>
     <div><label>種子</label><input id="seed" type="number" value="1"></div>
     <div><label>上貢門檻（破壞率）</label><input id="th" type="number" value="0.35" min="0" max="1" step="0.05"></div>
     <div><label>拿遺物</label><select id="pick"><option value="random">隨機</option><option value="build">照順序</option><option value="none">全部跳過</option></select></div>
-    <div><label>順序（逗號分隔 id）</label><input id="build" value="gear,sand,hoop,dust,blade"></div>
-    <div><label>回合上限</label><input id="maxRounds" type="number" value="60" min="5"></div>
+    <div><label>順序（逗號分隔 id）</label><input id="build" value="seal,rivet,nail,gear,brace,tongs,insurance,royalnail"></div>
+    <div><label>回合上限</label><input id="maxRounds" type="number" value="40" min="5"></div>
     <div><label><input id="hist" type="checkbox" style="width:auto"> 直方圖</label><button id="run" type="button">跑</button></div>
   </form>
   <div class="hint">笨 AI：商店階段買得起就買（劍幣不夠就投入多的武器）、武器少於供應量就用金幣補；鍛造階段看配額差多少決定上貢，最後一把會拚到破壞率 50%。只看結構，不代表人會怎麼玩。遺物 id 見 config.js。</div>

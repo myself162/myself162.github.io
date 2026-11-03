@@ -1,87 +1,128 @@
-// 鍛造原型 v2 設定檔。所有數值與遺物定義都在這裡，改這裡不用動程式。
-// 瀏覽器：掛在 window.FORGE_CONFIG；Node：module.exports。
+// 鍛造原型 v3 基準版設定檔：ForgeTax 的曲線、配額、價格與全部遺物數值 1:1；名稱與說明是我們自己的文字。
+// 由 tools/gen-config.py 從 ForgeTax 的 Economy 資料產生；手改也可以。瀏覽器：window.FORGE_CONFIG；Node：module.exports。
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) module.exports = factory();
   else root.FORGE_CONFIG = factory();
 })(typeof self !== 'undefined' ? self : this, function () {
-  return {
-    version: 'v2 2026-11-03',
-
-    // 回合：契約 contract 回合，之後進無盡。上貢不足累計 maxMisses 次，局結束。每回合供 supply 把武器。
-    rounds: { contract: 21, maxMisses: 3, supply: 3 },
-
-    // 武器價值 = base × perGrade^等級（四捨五入）。+5 ≈ 76，+10 ≈ 577，+15 ≈ 4379，+20 ≈ 33252。
-    value: { base: 10, perGrade: 1.5 },
-
-    // 配額：第 1 回合 base，之後每回合 ×growth；契約結束後每回合 ×endlessGrowth。
-    quota: { base: 60, growth: 1.25, endlessGrowth: 1.2 },
-
-    // 遺物商店：每回合開店 offers 個；重抽價 = max(rerollMin, 配額 × rerollFraction) × rerollGrowth^已付費重抽次數（每回合歸零）。
-    // 遺物用劍幣買。劍幣來源：回合結束沒用完的武器（1 把 = 1 幣）、商店裡投入武器、鍛造時把沒敲過的武器投入商店。
-    shop: { offers: 3, rerollFraction: 0.15, rerollMin: 10, rerollGrowth: 2.5 },
-
-    // 商人賣武器：每回合 swordStock 把；價格 = max(minPrice, 配額 × fraction) × growth^本回合已買把數。用金幣買。
-    // 金幣來源：每回合上貢的價值全額變成金幣（配額只是門檻）。
-    merchant: { swordStock: 2, fraction: 0.4, minPrice: 20, growth: 1.5 },
-
-    // 基礎籤（+0 時）。破壞籤另外由等級決定。
-    baseTickets: { break: 0, damage: 3, hold: 5, success: 10, great: 2 },
-
-    // 破壞籤 = 等級 × 這個數字。每升一級多幾張，畫在籤紙上，永不封頂。
-    breakTicketsPerGrade: 1,
-
-    // 各結果的等級變化。破壞 = 失去武器。
-    gradeDelta: { great: 2, success: 1, hold: 0, damage: -1 },
-
-    // 入神：每一次普通鎚擊充能 +1，滿 threshold 進入入神 strikes 鎚（破壞籤 = 0），
-    // 結束後這把武器永久 +scar 張破壞籤（淬火疤）。疤隨武器消失。
-    fever: { threshold: 10, strikes: 6, scar: 2 },
-
-    // 遺物格與護盾位（標記 shield 的遺物同時只能持有這麼多個）。
-    relicSlots: 5,
-    shieldSlots: 1,
-
-    // 開局免費三選一。
-    starterOffer: true,
-
-    // 遺物。effect 決定引擎走哪段邏輯，數字都可以改。price 是劍幣。
-    // tickets：對籤數的加減。text / cost 只是顯示用。
-    relics: [
-      { id: 'sand', name: '磁砂', family: '成功', price: 1, effect: 'tickets',
-        tickets: { success: 4, damage: 1 },
-        text: '成功籤 +4', cost: '損傷籤 +1' },
-
-      { id: 'dust', name: '金屑', family: '大成功', price: 1, effect: 'tickets',
-        tickets: { great: 2, break: 1 },
-        text: '大成功籤 +2', cost: '破壞籤 +1' },
-
-      { id: 'hoop', name: '鐵箍', family: '防禦', price: 1, effect: 'tickets',
-        tickets: { break: -2, success: -2 }, breakMin: 1,
-        text: '破壞籤 −2（最低 1）', cost: '成功籤 −2' },
-
-      { id: 'slow', name: '慢火', family: '維持', price: 1, effect: 'holdUpgrade',
-        tickets: { hold: 3, success: -1 }, holdsNeeded: 3,
-        text: '維持籤 +3；每累積 3 次維持，下一次成功升級為大成功', cost: '成功籤 −1' },
-
-      { id: 'blade', name: '備用刃', family: '護盾', price: 2, shield: true, effect: 'shieldFirstBreak',
-        gradeLoss: 3, scarAfter: 2,
-        text: '每把武器第一次破壞改為「掉 3 級」', cost: '佔護盾位；觸發後這把武器破壞籤 +2' },
-
-      { id: 'pact', name: '血契', family: '護盾', price: 2, shield: true, effect: 'shieldFromDamage',
-        tickets: { damage: 2 }, damagesPerShield: 2, maxShield: 1,
-        text: '每吃 2 次損傷，儲存一次「破壞改為損傷」，最多存 1', cost: '佔護盾位；損傷籤 +2' },
-
-      { id: 'bellows', name: '風箱', family: '入神', price: 1, effect: 'feverMod',
-        feverStrikes: 9, feverScar: 3,
-        text: '入神鎚數 6 → 9', cost: '淬火疤 +2 → +3' },
-
-      { id: 'ember', name: '餘燼', family: '入神', price: 1, effect: 'emberMod',
-        startCharge: 3, feverThreshold: 12,
-        text: '每把新武器起手充能 +3', cost: '入神門檻 10 → 12' },
-
-      { id: 'gear', name: '齒輪', family: '累積', price: 2, effect: 'accumulateSuccess',
-        tickets: { great: -1 }, perSuccess: 1,
-        text: '每次成功或大成功，這把武器的成功籤 +1（上貢或破壞後歸零）', cost: '大成功籤 −1' },
-    ],
+  const items = [
+    { id: 'nail', name: '鍛釘', family: '成功', rarity: 0, tier: 0, price: 1, min: 2, consumable: false, text: '成功籤 +4' },
+    { id: 'file', name: '細砥', family: '成功', rarity: 0, tier: 0, price: 1, min: 2, consumable: false, text: '維持籤 −2、成功籤 +2' },
+    { id: 'seal', name: '墨繩結', family: '防禦', rarity: 0, tier: 0, price: 1, min: 2, consumable: false, text: '破壞機率 ×0.9' },
+    { id: 'glove', name: '第二雙手', family: '成功', rarity: 1, tier: 0, price: 2, min: 3, consumable: false, text: '每連續 2 次成功或大成功，額外 +1 級' },
+    { id: 'coin', name: '驗印', family: '成功', rarity: 0, tier: 0, price: 1, min: 2, consumable: false, text: '每次成功或大成功，劍價值 +100 G' },
+    { id: 'pin', name: '亮釘', family: '大成功', rarity: 1, tier: 1, price: 2, min: 3, consumable: false, text: '大成功籤 +2' },
+    { id: 'bell', name: '啞鐘', family: '大成功', rarity: 1, tier: 1, price: 1, min: 4, consumable: false, text: '每次大成功，劍價值 ×1.2' },
+    { id: 'hold', name: '定石', family: '維持', rarity: 0, tier: 0, price: 1, min: 2, consumable: false, text: '維持籤 +2；每連續 2 次維持 +1 級' },
+    { id: 'knot', name: '雙結線', family: '成功', rarity: 0, tier: 1, price: 1, min: 3, consumable: false, text: '每連續 2 次成功或大成功，劍價值 ×1.1' },
+    { id: 'star', name: '閃紋', family: '大成功', rarity: 1, tier: 1, price: 1, min: 4, consumable: false, text: '普通鎚擊大成功後，下一鎚破壞機率 ×0.6' },
+    { id: 'insurance', name: '鐵線鞘', family: '防禦', rarity: 1, tier: 1, price: 2, min: 4, consumable: false, text: '每回合第一次破壞改為損傷' },
+    { id: 'echo', name: '回音鎚', family: '成功', rarity: 1, tier: 1, price: 2, min: 5, consumable: false, text: '每次成功或大成功，25% 機率額外 +1 級' },
+    { id: 'still', name: '餘火', family: '維持', rarity: 1, tier: 2, price: 3, min: 4, consumable: false, text: '每次維持，70% 機率 +1 級' },
+    { id: 'rivet', name: '鐵環箍', family: '防禦', rarity: 0, tier: 0, price: 1, min: 3, consumable: false, text: '破壞籤 −2' },
+    { id: 'brace', name: '焦符', family: '成功', rarity: 1, tier: 0, price: 1, min: 3, consumable: false, text: '普通鎚擊每次成功或大成功，這把劍破壞機率 −3%，最多 −18%' },
+    { id: 'shard', name: '送葬杯', family: '破壞', rarity: 1, tier: 1, price: 1, min: 2, consumable: false, text: '劍破壞時，最高價值的 30% 當作廢鐵上貢' },
+    { id: 'mold', name: '鎮石', family: '維持', rarity: 0, tier: 0, price: 1, min: 2, consumable: false, text: '每次維持，劍價值 +180 G' },
+    { id: 'phoenix', name: '鳳灰', family: '防禦', rarity: 2, tier: 2, price: 3, min: 6, consumable: false, text: '每把劍擋一次破壞，劍價值 ×0.6' },
+    { id: 'speed', name: '滑柄', family: '入神', rarity: 1, tier: 0, price: 2, min: 4, consumable: false, text: '入神鎚數按速度 +15% 計' },
+    { id: 'supply', name: '加供許可', family: '經濟', rarity: 1, tier: 1, price: 4, min: 8, consumable: false, text: '每回合武器 +1' },
+    { id: 'repair', name: '裂接片', family: '損傷', rarity: 1, tier: 0, price: 2, min: 3, consumable: false, text: '每次損傷，這把劍破壞機率 −15%，最多 −60%' },
+    { id: 'tongs', name: '鱗鉗', family: '防禦', rarity: 1, tier: 1, price: 2, min: 5, consumable: false, text: '+6 以上，破壞機率 ×0.75' },
+    { id: 'grudge', name: '怨釘', family: '破壞', rarity: 1, tier: 1, price: 2, min: 3, consumable: false, text: '劍破壞時，累積等同其等級的大成功籤；大成功後歸零' },
+    { id: 'rage', name: '封心', family: '維持', rarity: 1, tier: 1, price: 2, min: 3, consumable: false, text: '每次維持儲存 +1（最多 4），下次大成功時全部加上' },
+    { id: 'bellows', name: '鼓風箱', family: '入神', rarity: 2, tier: 2, price: 3, min: 7, consumable: false, text: '入神鎚數按速度 +30% 計' },
+    { id: 'holy', name: '斷聖劍', family: '破壞', rarity: 1, tier: 1, price: 1, min: 3, consumable: false, text: '破壞的劍 30% 等級繼承給下一把未鍛造的 +0 劍，並給 3 格充能' },
+    { id: 'ossuary', name: '骨鞘', family: '破壞', rarity: 1, tier: 2, price: 3, min: 5, consumable: false, text: '+7 以上的劍破壞時，依破壞前一鎚的結果，本局永久多 1 張對應的籤' },
+    { id: 'crown', name: '缺冠', family: '損傷', rarity: 1, tier: 1, price: 1, min: 3, consumable: false, text: '損傷損失的強化價值，保留 50% 為固定值' },
+    { id: 'spine', name: '巨骨', family: '損傷', rarity: 1, tier: 1, price: 2, min: 5, consumable: false, text: '每 2 次損傷儲存一次「破壞改為損傷」，最多存 1' },
+    { id: 'royalseal', name: '舊王璽', family: '損傷', rarity: 1, tier: 2, price: 3, min: 4, consumable: false, text: '每次損傷儲存 +1 級，下次大成功時加上' },
+    { id: 'dice', name: '盲骰', family: '混合', rarity: 0, tier: 1, price: 1, min: 3, consumable: false, text: '損傷或維持後，下一鎚大成功籤 +3' },
+    { id: 'hourglass', name: '鍊漏', family: '維持', rarity: 0, tier: 1, price: 1, min: 3, consumable: false, text: '普通鎚擊維持時，50% 機率充能 +1' },
+    { id: 'incense', name: '灰香爐', family: '混合', rarity: 1, tier: 1, price: 2, min: 4, consumable: false, text: '結果與上一鎚不同時，劍基礎價值 +20 G' },
+    { id: 'mirror', name: '雙鏡', family: '混合', rarity: 2, tier: 2, price: 3, min: 6, consumable: false, text: '連續 2 次相同結果時，再觸發一次最後的價值加成' },
+    { id: 'idol', name: '縛像', family: '混合', rarity: 0, tier: 0, price: 1, min: 2, consumable: false, text: '每把劍首次到 +4、+8、+12…時，劍價值 ×1.15' },
+    { id: 'headless', name: '無首鐘', family: '入神', rarity: 1, tier: 1, price: 2, min: 6, consumable: false, text: '入神結束時 +1 級' },
+    { id: 'hook', name: '討債鉤', family: '經濟', rarity: 1, tier: 1, price: 2, min: 4, consumable: false, text: '重抽後，本回合第一次投入未鍛造的 +0 劍得 2 劍幣' },
+    { id: 'thorn', name: '荊砝', family: '損傷', rarity: 0, tier: 0, price: 1, min: 3, consumable: false, text: '劍價值 ×1.1；維持籤 −2、損傷籤 +2' },
+    { id: 'obsidian', name: '黑曜眼', family: '大成功', rarity: 1, tier: 1, price: 2, min: 6, consumable: false, text: '+8 以上，2 張成功籤轉為大成功籤' },
+    { id: 'testament', name: '匠人遺書', family: '經濟', rarity: 1, tier: 1, price: 2, min: 5, consumable: false, text: '用 +10 以上的劍達標後，下回合第一把劍從該回合最高上貢等級的 30% 開始' },
+    { id: 'coal', name: '炭袋', family: '價值', rarity: 0, tier: 0, price: 1, min: 2, consumable: false, text: '劍基礎價值 +80 G' },
+    { id: 'token', name: '鐵章', family: '價值', rarity: 0, tier: 0, price: 1, min: 2, consumable: false, text: '劍價值 ×1.15' },
+    { id: 'mallet', name: '鈍鎚', family: '成功', rarity: 0, tier: 0, price: 1, min: 2, consumable: false, text: '損傷籤 −1、成功籤 +1' },
+    { id: 'patience', name: '候墜', family: '維持', rarity: 0, tier: 0, price: 1, min: 2, consumable: false, text: '維持籤 +3' },
+    { id: 'spark', name: '火星', family: '大成功', rarity: 0, tier: 0, price: 1, min: 2, consumable: false, text: '大成功籤 +1' },
+    { id: 'thread', name: '紅縷', family: '防禦', rarity: 0, tier: 0, price: 1, min: 2, consumable: false, text: '維持後，下一鎚破壞機率 ×0.8' },
+    { id: 'apron', name: '補裙', family: '損傷', rarity: 0, tier: 0, price: 1, min: 2, consumable: false, text: '每次損傷，劍價值 +140 G' },
+    { id: 'cup', name: '冷杯', family: '維持', rarity: 0, tier: 0, price: 1, min: 3, consumable: false, text: '每次維持，劍價值 ×1.06' },
+    { id: 'fork', name: '銀叉', family: '大成功', rarity: 1, tier: 1, price: 2, min: 4, consumable: false, text: '普通鎚擊大成功時額外 +1 級' },
+    { id: 'gear', name: '銅齒', family: '成功', rarity: 1, tier: 0, price: 3, min: 5, consumable: false, text: '每次成功，這把劍成功籤 +1' },
+    { id: 'chime', name: '風鈴', family: '維持', rarity: 0, tier: 0, price: 1, min: 3, consumable: false, text: '每次維持儲存 +1（最多 2），下次成功時加上' },
+    { id: 'blackstone', name: '黑砥', family: '價值', rarity: 1, tier: 0, price: 2, min: 5, consumable: false, text: '+8 以上，劍價值 ×1.3' },
+    { id: 'ledger', name: 'ledger', family: '經濟', rarity: 0, tier: 0, price: 1, min: 3, consumable: false, excluded: true, why: '原作停售', text: '' },
+    { id: 'safe', name: 'safe', family: '經濟', rarity: 0, tier: 0, price: 1, min: 3, consumable: false, excluded: true, why: '原作停售', text: '' },
+    { id: 'voucher', name: '舊券', family: '經濟', rarity: 1, tier: 0, price: 2, min: 3, consumable: false, text: '每回合免費重抽 1 次' },
+    { id: 'sieve', name: '灰篩', family: '破壞', rarity: 0, tier: 0, price: 1, min: 2, consumable: false, text: '劍破壞時 +500 G' },
+    { id: 'burial', name: 'burial', family: '破壞', rarity: 1, tier: 0, price: 2, min: 4, consumable: false, excluded: true, why: '原作停售', text: '' },
+    { id: 'locket', name: '燼墜', family: '入神', rarity: 1, tier: 1, price: 2, min: 4, consumable: false, text: '每把劍第一鎚充能 +3' },
+    { id: 'watch', name: '裂錶', family: '損傷', rarity: 0, tier: 0, price: 1, min: 3, consumable: false, text: '普通鎚擊損傷時充能 +1' },
+    { id: 'collar', name: '鈴圈', family: '入神', rarity: 1, tier: 1, price: 2, min: 6, consumable: false, text: '入神期間每一鎚，劍價值 ×1.05' },
+    { id: 'glass', name: '玻漏', family: '入神', rarity: 1, tier: 1, price: 2, min: 5, consumable: false, text: '入神期間大成功 +3 級' },
+    { id: 'loop', name: 'loop', family: '入神', rarity: 0, tier: 0, price: 1, min: 2, consumable: false, excluded: true, why: '只影響非入神的即時速度，本版無此節奏', text: '' },
+    { id: 'firstseal', name: '初印', family: '成功', rarity: 0, tier: 0, price: 1, min: 2, consumable: false, text: '每把劍第一鎚成功或大成功時，額外 +2 級' },
+    { id: 'thirdeye', name: '閉眼', family: '維持', rarity: 0, tier: 0, price: 1, min: 3, consumable: false, text: '維持後，下一鎚成功籤 +4' },
+    { id: 'collector', name: '稅牌', family: '經濟', rarity: 1, tier: 1, price: 3, min: 5, consumable: false, text: '每次達標，劍幣 +1' },
+    { id: 'patchbag', name: 'patchbag', family: '經濟', rarity: 0, tier: 0, price: 1, min: 2, consumable: false, excluded: true, why: '原作停售', text: '' },
+    { id: 'badge', name: '工徽', family: '經濟', rarity: 1, tier: 1, price: 2, min: 4, consumable: false, text: '達標後，下回合所有劍從 +2 開始' },
+    { id: 'ironcomb', name: '鐵篦', family: '損傷', rarity: 0, tier: 0, price: 1, min: 3, consumable: false, text: '每次損傷，損傷前基礎價值的 5% 加為固定值' },
+    { id: 'wax', name: '蠟像', family: '混合', rarity: 0, tier: 0, price: 1, min: 2, consumable: false, text: '每連續 2 次相同結果，劍價值 +150 G' },
+    { id: 'scales', name: '齒砝', family: '混合', rarity: 1, tier: 1, price: 2, min: 4, consumable: false, text: '損傷後的下一鎚為成功或大成功時，額外 +2 級' },
+    { id: 'letter', name: '密函', family: '經濟', rarity: 1, tier: 1, price: 2, min: 5, consumable: false, text: '配額 ×0.9' },
+    { id: 'tooth', name: '餓齒', family: '破壞', rarity: 0, tier: 0, price: 1, min: 3, consumable: false, text: '+4 以上的劍破壞後，下一把未鍛造的 +0 劍得 4 張成功籤，直到該劍消失' },
+    { id: 'royalnail', name: '王釘', family: '成功', rarity: 1, tier: 1, price: 2, min: 6, consumable: false, text: '成功籤 +6' },
+    { id: 'mourning', name: '喪結', family: '破壞', rarity: 1, tier: 2, price: 1, min: 3, consumable: false, text: '每次上貢不足，本局永久大成功籤 +1' },
+    { id: 'oath', name: '誓言', family: '損傷', rarity: 1, tier: 1, price: 2, min: 4, consumable: false, text: '每次損傷，70% 機率 +1 級' },
+    { id: 'kingcup', name: '空杯', family: '維持', rarity: 2, tier: 2, price: 3, min: 6, consumable: false, text: '每次維持，這把劍大成功籤 +1' },
+    { id: 'goldgear', name: '金齒', family: '成功', rarity: 1, tier: 2, price: 2, min: 5, consumable: false, text: '每次成功，劍基礎價值 +30 G' },
+    { id: 'oracledie', name: '神骰', family: '大成功', rarity: 2, tier: 2, price: 3, min: 9, consumable: false, text: '大成功籤 +4' },
+    { id: 'hearth', name: '懷爐', family: '價值', rarity: 1, tier: 1, price: 3, min: 7, consumable: false, text: '本局每次達標，劍基礎價值 +20 G' },
+    { id: 'redglass', name: '紅漏', family: '入神', rarity: 1, tier: 2, price: 2, min: 6, consumable: false, text: '入神時間 +1 秒（鎚數變多）' },
+    { id: 'dragonseal', name: '龍章', family: '價值', rarity: 2, tier: 2, price: 3, min: 9, consumable: false, text: '+12 以上，劍價值 ×1.5' },
+    { id: 'silverpermit', name: '銀許可', family: '經濟', rarity: 1, tier: 2, price: 2, min: 6, consumable: false, text: '商人基礎劍庫存 +2' },
+    { id: 'ward', name: '鱗片', family: '消耗品', rarity: 0, tier: 0, price: 0, min: 3, consumable: true, goldFraction: 0.3, goldMinimum: 500, quantity: 1, text: '擋下一鎚的破壞。無論結果都會用掉；入神中或充能滿時不能用' },
+    { id: 'rewind', name: '回溯錶', family: '消耗品', rarity: 1, tier: 1, price: 0, min: 3, consumable: true, goldFraction: 0.85, goldMinimum: 1500, quantity: 1, text: '撤銷上一鎚，破壞也能復原。離開鐵砧前有效' },
+    { id: 'chalk', name: '粉筆', family: '消耗品', rarity: 0, tier: 0, price: 0, min: 6, consumable: true, goldFraction: 0.4, goldMinimum: 700, quantity: 1, text: '下一鎚大成功籤 ×2' },
+    { id: 'powder', name: '火藥', family: '消耗品', rarity: 1, tier: 1, price: 0, min: 6, consumable: true, goldFraction: 0.5, goldMinimum: 800, quantity: 1, text: '下一次普通鎚擊：成功和大成功變大成功，其餘全變破壞' },
+    { id: 'starshard', name: '星屑', family: '消耗品', rarity: 1, tier: 1, price: 0, min: 6, consumable: true, goldFraction: 0.5, goldMinimum: 800, quantity: 1, text: '充能 +3；入神中不能用' },
+    { id: 'oblivion', name: '忘香', family: '消耗品', rarity: 2, tier: 2, price: 0, min: 9, consumable: true, goldFraction: 1.2, goldMinimum: 3500, quantity: 1, text: '買下即怒氣 −1；每局一次，有怒氣才賣' },
+    { id: 'delivery', name: '送貨單', family: '消耗品', rarity: 1, tier: 1, price: 0, min: 6, consumable: true, goldFraction: 0.65, goldMinimum: 1000, quantity: 1, text: '買下後下回合武器 +2' },
+    { id: 'cornerstone', name: '基石', family: '特殊劍', rarity: 2, tier: 2, price: 4, min: 7, consumable: false, unlock: 'FORGE20_CITADEL', text: '每把劍第一次破壞改為損傷' },
+    { id: 'dawnsheath', name: '曉鞘', family: '特殊劍', rarity: 2, tier: 2, price: 3, min: 6, consumable: false, unlock: 'FORGE20_HOLY', text: '破壞的劍 40% 等級繼承給下一把未鍛造的 +0 劍，並給 4 格充能；與斷聖劍相加' },
+    { id: 'endlessaxle', name: '永軸', family: '特殊劍', rarity: 2, tier: 2, price: 4, min: 7, consumable: false, unlock: 'FORGE20_SAW', text: '每 2 次成功額外 +1 級' },
+    { id: 'dragonheart', name: '龍心', family: '特殊劍', rarity: 2, tier: 2, price: 4, min: 8, consumable: false, unlock: 'FORGE20_DRAGON', text: '+7 以上每次成功或大成功，劍價值 ×1.15' },
+    { id: 'perfectcore', name: '魔核', family: '特殊劍', rarity: 2, tier: 2, price: 4, min: 7, consumable: false, unlock: 'FORGE20_RUNE', text: '入神期間大成功籤 +6' },
+    { id: 'twinseal', name: 'twinseal', family: '特殊劍', rarity: 2, tier: 2, price: 4, min: 8, consumable: false, unlock: 'FORGE20_SPLIT', excluded: true, why: '複製劍需要劍架', text: '' },
+    { id: 'eternalseed', name: '永種', family: '特殊劍', rarity: 2, tier: 2, price: 4, min: 7, consumable: false, unlock: 'FORGE20_WORLDTREE', text: '維持籤 +6；每次維持，劍基礎價值 +40 G' },
+    { id: 'deeppearl', name: '深珠', family: '特殊劍', rarity: 2, tier: 2, price: 4, min: 7, consumable: false, unlock: 'FORGE20_FISH', text: '損傷籤 +3；每把劍前 2 次損傷不掉級' },
+    { id: 'funeralledger', name: '殯帳', family: '成就', rarity: 2, tier: 0, price: 4, min: 8, consumable: false, unlock: 'FORGE20_FUNERARY', text: '+7 以上的劍破壞時，下回合多發 1 把，每回合最多 2 把' },
+    { id: 'butterfingers', name: '笨手', family: '成就', rarity: 2, tier: 0, price: 3, min: 6, consumable: false, unlock: 'FORGE_BROKEN10', text: '破壞籤 +3、大成功籤 +5' },
+    { id: 'everwick', name: '長芯', family: '成就', rarity: 2, tier: 0, price: 4, min: 8, consumable: false, unlock: 'FORGE_FRENZY5', text: '入神時間 +2 秒（鎚數變多）' },
+    { id: 'royalchange', name: '王零', family: '成就', rarity: 2, tier: 0, price: 4, min: 7, consumable: false, unlock: 'FORGE_TRIPLETRIBUTE', text: '超額上貢的 30% 抵下次配額，最多抵 30%' },
+    { id: 'dragonpardon', name: '赦狀', family: '成就', rarity: 2, tier: 0, price: 4, min: 6, consumable: false, unlock: 'FORGE_LASTCHANCE', text: '怒氣滿時抵擋一次，怒氣降為 2，然後消失' },
+    { id: 'ghostledger', name: '鬼帳', family: '成就', rarity: 2, tier: 0, price: 3, min: 6, consumable: false, unlock: 'FORGE_SOLDOUT', text: '商人欄位 +2' },
+    { id: 'sicklehammer', name: '鐮鎚', family: '成就', rarity: 2, tier: 0, price: 4, min: 6, consumable: false, unlock: 'FORGE_CLEAR', text: '五種籤的基礎張數全部變 5' },
+    { id: 'lifecontract', name: '終契', family: '成就', rarity: 2, tier: 0, price: 5, min: 10, consumable: false, unlock: 'FORGE_OVERTIME3', text: '配發的劍全部從 +7 開始' },
+  ];
+  const cfg = {
+    version: 'v3 基準版 2026-11-03',
+    // 價值 = (baseValue + 加成) × gradeMultiplier^等級；大成功時價值跳到 ×greatMultiplier
+    baseValue: 320, gradeMultiplier: 1.5, greatMultiplier: 2.5, maxGrade: 99,
+    contractRound: 21, endlessGrowth: 1.2,
+    quotas: [1800, 2100, 2600, 3350, 4350, 5700, 7500, 9800, 12800, 16700, 21500, 27750, 35700, 45800, 58650, 74650, 94550, 119350, 149950, 186850, 232000],
+    // 無遺物時各等級的實際破壞率；破壞籤會乘上 p/(1-p)×21/9，讓籤紙上 9 張破壞籤剛好對應這條曲線
+    breakCurve: [0, 0.018, 0.059, 0.129, 0.248, 0.297, 0.347, 0.383, 0.418, 0.443, 0.467, 0.491, 0.505, 0.519, 0.532, 0.545, 0.558, 0.576, 0.594, 0.612, 0.63, 0.639, 0.648, 0.657, 0.666, 0.675, 0.684, 0.693, 0.702, 0.711, 0.72],
+    relicSlots: 8,
+    starterPool: ['nail', 'seal', 'coin', 'hold', 'repair', 'rage', 'shard', 'spark'],
+    items,
+    itemsById: Object.fromEntries(items.map(i => [i.id, i])),
   };
+  return cfg;
 });
