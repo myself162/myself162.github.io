@@ -136,6 +136,8 @@
   .records th { color: var(--muted); font-weight: 500; }
   .muted { color: var(--muted); }
   .hide { display: none !important; }
+  #notice { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: #3a2d22; color: var(--amber2); border: 1px solid var(--amber); border-radius: 10px; padding: 10px 14px; font-size: 14px; max-width: 90vw; z-index: 20; opacity: 0; transition: opacity .2s; pointer-events: none; }
+  #notice.on { opacity: 1; }
 </style>
 </head>
 <body>
@@ -203,6 +205,7 @@
   <div class="records" id="records"></div>
 </div>
 
+<div id="notice"></div>
 <div class="modal" id="offerModal"><div class="sheet" id="offerSheet"></div></div>
 <div class="modal" id="settleModal"><div class="sheet settle" id="settleSheet"></div></div>
 <div class="modal" id="endModal"><div class="sheet end" id="endSheet"></div></div>
@@ -239,6 +242,8 @@
   let rec = loadRecords();
 
   const name = id => { const d = E.item(cfg, id); return d ? d.name : (id === 'fever' ? '入神' : id === 'sword' ? '基礎劍' : id); };
+  let noticeTimer = 0;
+  function notify(text) { const n = $('notice'); n.textContent = text; n.classList.add('on'); clearTimeout(noticeTimer); noticeTimer = setTimeout(() => n.classList.remove('on'), 2600); }
   const esc = t => String(t).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
   const money = n => Math.round(n).toLocaleString('en-US');
   const pct = x => (100 * x).toFixed(1) + '%';
@@ -309,7 +314,7 @@
       const d = E.item(cfg, o.id);
       const owned = s.relics.includes(o.id);
       const can = !o.sold && !owned && s.credits >= o.price;
-      const extra = '<span class="price">' + (o.sold ? '已售出' : owned ? '已持有' : '劍幣 ' + o.price) + '</span>';
+      const extra = '<span class="price">' + (o.sold ? '已售出' : owned ? '已持有' : '劍幣 ' + o.price + (can ? '' : '（你有 ' + s.credits + '）')) + '</span>';
       return '<button class="card' + (o.sold || owned ? ' sold' : (can ? '' : ' cant')) + '" data-buy="' + i + '" ' + (o.sold || owned ? 'disabled' : '') + '>' + cardInner(d, extra) + '</button>';
     }).join('') || '<div class="muted">這回合沒有遺物可賣。</div>';
     const rp = E.rerollPrice(s);
@@ -548,11 +553,16 @@
     const b = ev.target.closest('button[data-buy]'); if (!b) return;
     const i = +b.dataset.buy; const r = E.buyRelic(s, i);
     if (!r.ok && r.needReplace) pendingPick = i;
+    else if (!r.ok && r.reason === 'credits') notify('劍幣不夠：要 ' + s.offers[i].price + ' 枚，你有 ' + s.credits + ' 枚。把劍投進販賣機可以換劍幣（1 把 1 枚）。');
+    else if (!r.ok) notify('現在不能買。');
     render();
   });
   $('merchantBox').addEventListener('click', ev => {
     const b = ev.target.closest('button[data-merchant]'); if (!b) return;
-    E.buyMerchant(s, +b.dataset.merchant); render();
+    const i = +b.dataset.merchant; const r = E.buyMerchant(s, i);
+    if (!r.ok && r.reason === 'gold') notify('金幣不夠：要 ' + money(s.merchant.offers[i].price) + '，你有 ' + money(s.wallet) + '。');
+    else if (!r.ok) notify('現在不能買。');
+    render();
   });
   $('quickUse').addEventListener('click', ev => {
     const b = ev.target.closest('button'); if (!b) return;
