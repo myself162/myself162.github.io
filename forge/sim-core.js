@@ -55,6 +55,8 @@
         const offers = s.merchant.offers;
         const si = offers.findIndex(o => o.id === 'sword');
         while (si >= 0 && E.merchantRemaining(offers[si]) > 0 && s.wallet >= offers[si].price && s.swords.length < 4) { if (!E.buyMerchant(s, si).ok) break; }
+        const spi = offers.findIndex(o => E.isSwordKind(o.id));
+        if (spi >= 0 && E.merchantRemaining(offers[spi]) > 0 && s.wallet >= offers[spi].price * 1.5) E.buyMerchant(s, spi);
         const wi = offers.findIndex(o => o.id === 'ward');
         if (wi >= 0 && E.merchantRemaining(offers[wi]) > 0 && s.wallet >= offers[wi].price * 2) E.buyMerchant(s, wi);
         const ri = offers.findIndex(o => o.id === 'rewind');
@@ -80,7 +82,7 @@
     let cleared = 0;
     const relicPicks = {}, diedAt = {};
     for (let n = 0; n < RUNS; n++) {
-      const s = E.newRun(cfg, { seed: SEED * 1000003 + n });
+      const s = E.newRun(cfg, { seed: SEED * 1000003 + n, unlocks: opts.unlocks === 'none' ? [] : 'all' });
       let guard = 0, shopRound = 0;
       while (!s.ended && guard++ < 400000) {
         if (s.phase === 'settle') { if (s.round >= MAXR) { E.endRun(s); break; } E.nextRound(s); continue; }

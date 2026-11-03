@@ -46,9 +46,21 @@
   function gradeCap(cfg) { return cfg.maxGrade; }
 
   // ---------- 價值 ----------
+  function isSpecial(w) { return w.kind === 'worldtree' || w.kind === 'seafood' || w.kind === 'funerary'; }
   function basis(s, w, grade) {
     const e = w.effects;
-    return (s.cfg.baseValue + e.baseBonus + e.seedBase + e.growthBase) * Math.pow(s.cfg.gradeMultiplier, grade);
+    return (s.cfg.baseValue * (isSpecial(w) ? 2 : 1) + e.baseBonus + e.seedBase + e.growthBase) * Math.pow(s.cfg.gradeMultiplier, grade);
+  }
+  // 劍系：1 到 6 是基礎劍的 3 母系 × 2 分支，7 古木、8 海魚、9 葬儀。
+  function family(w) { return w.kind === 'funerary' ? 9 : w.kind === 'seafood' ? 8 : w.kind === 'worldtree' ? 7 : w.parent * 2 + w.branch + 1; }
+  // 原作外觀：+6 起看得出母系，+10 起看得出分支（用這把劍到過的最高等級判斷）。
+  function lineName(cfg, w) {
+    const L = cfg.lines;
+    if (isSpecial(w)) return L.special[w.kind];
+    const g = Math.max(w.grade, w.peakGrade || 0);
+    if (g < 6) return L.generic;
+    if (g < 10) return L.groups[w.parent];
+    return L.names[family(w)];
   }
   function valueOf(s, w) {
     const e = w.effects;
@@ -180,6 +192,7 @@
     else { w.feverLeft = feverStrikes(s); w.feverTotal = w.feverLeft; w.feverUntil = 0; }
     e.feverStartGrade = w.grade; e.feverEndBonus = 0; e.bellowsHits = 0; e.feverActivations++;
     s.feverEvents++; s.stats.fevers++;
+    earn(s, 'FORGE_FIRSTFRENZY');
     return true;
   }
   function finishFever(s, w, procs) {
@@ -217,10 +230,52 @@
       multiplier: 1.0, greatMultiplier: 1.0, risk: 1.0, peak: 320, flat: 0,
     };
   }
-  function newSword(s, grade) {
-    const w = { serial: ++s.swordSerial, grade: grade || 0, value: 320, strikes: 0, broken: false, lastOutcome: null, resultStreak: 0, feverLeft: 0, feverTotal: 0, effects: newEffects(), procs: [] };
+  function newSword(s, grade, kind, parent) {
+    const w = {
+      serial: ++s.swordSerial, kind: kind || 'basic',
+      parent: parent == null ? Math.floor(s.rng() * 3) : parent, branch: Math.floor(s.rng() * 2),
+      grade: grade || 0, peakGrade: grade || 0, value: 320, strikes: 0, broken: false, lastOutcome: null, resultStreak: 0,
+      feverLeft: 0, feverTotal: 0, feverUntil: 0, duplicateRequested: false, effects: newEffects(), procs: [],
+    };
     refreshValue(s, w);
     return w;
+  }
+  // 雙生印：每鎚 2% 複製鐵砧上的劍（原作 RollDuplicate + ResolveSwordDuplicate）。
+  function rollDuplicate(s, w, procs) {
+    if (rank(s, 'twinseal') && s.rng() < 0.02) { w.duplicateRequested = true; proc(s, w, 'twinseal', '複製了一把', w.value, procs); }
+  }
+  function resolveDuplicate(s, w) {
+    if (!w.duplicateRequested || w.broken) return null;
+    w.duplicateRequested = false;
+    const c = JSON.parse(JSON.stringify(w));
+    c.serial = ++s.swordSerial; c.place = 'rack'; c.heated = false; c.issuedRound = s.round; c.procs = [];
+    c.feverLeft = 0; c.feverUntil = 0; c.duplicateRequested = false;
+    c.effects.charge = 0; c.effects.bellowsHits = 0; c.effects.wardArmed = c.effects.chalkArmed = c.effects.powderArmed = false;
+    s.swords.push(c);
+    return c;
+  }
+
+  // ---------- 成就（跨局保存；解鎖的遺物才進商店池） ----------
+  function hasUnlock(s, id) { return !id || s.earned.has(id); }
+  function earn(s, id) {
+    if (!s.cfg.achievementsById[id] || s.earned.has(id)) return false;
+    s.earned.add(id); s.newlyEarned.push(id);
+    if (s.onEarn) s.onEarn(id);
+    return true;
+  }
+  function observeSword(s, w) {
+    if (!w || w.broken) return;
+    w.peakGrade = Math.max(w.peakGrade || 0, w.grade);
+    if (w.grade >= 10) earn(s, 'FORGE_FIRST10');
+    if (w.grade >= 20) { const f = family(w); for (const a of s.cfg.achievements) if (a.family === f && w.grade >= a.grade) earn(s, a.id); }
+  }
+  function observeRun(s) {
+    if (s.brokenSwords >= 10) earn(s, 'FORGE_BROKEN10');
+    if (s.feverEvents >= 5) earn(s, 'FORGE_FRENZY5');
+    if (s.overpaidTriple) earn(s, 'FORGE_TRIPLETRIBUTE');
+    if (s.lastRagePaid) earn(s, 'FORGE_LASTCHANCE');
+    if (s.merchantSoldOut) earn(s, 'FORGE_SOLDOUT');
+    if (s.endlessPaidTributes >= 3) earn(s, 'FORGE_OVERTIME3');
   }
   // 原作 PrimeSword：第一鎚前套用繼承。
   function primeSword(s, w, procs) {
@@ -288,11 +343,11 @@
     let outcome = raw, spineFlag = false;
     if (raw === 'break') {
       e.successStreak = e.holdStreak = 0;
-      if (wardArmed) { proc(s, w, 'ward', '鱗片擋下破壞', value, procs); return; }
+      if (wardArmed) { proc(s, w, 'ward', '鱗片擋下破壞', value, procs); rollDuplicate(s, w, procs); return; }
       if (rank(s, 'cornerstone') && e.cornerstoneUses === 0) { e.cornerstoneUses++; outcome = 'damage'; proc(s, w, 'cornerstone', '破壞改為損傷', value, procs); }
       else if (rank(s, 'insurance') && !s.insured) { s.insured = true; outcome = 'damage'; proc(s, w, 'insurance', '破壞改為損傷', value, procs); }
       else if (rank(s, 'spine') && e.spineShield) { e.spineShield = false; outcome = 'damage'; spineFlag = true; proc(s, w, 'spine', '破壞改為損傷', value, procs); }
-      else if (rank(s, 'phoenix') && e.phoenix === 0) { e.phoenix = 1; multiply(s, w, 'phoenix', 0.6, procs); w.value = valueOf(s, w); return; }
+      else if (rank(s, 'phoenix') && e.phoenix === 0) { e.phoenix = 1; multiply(s, w, 'phoenix', 0.6, procs); w.value = valueOf(s, w); rollDuplicate(s, w, procs); return; }
       else {
         s.brokenSwords++; s.stats.breaks++;
         if (w.grade >= 7 && rank(s, 'funeralledger') && s.funeralClaims < 2) { s.funeralClaims++; s.funeralPending++; procs.push({ item: 'funeralledger', text: '下回合多發 1 把', before: value, after: value }); }
@@ -399,6 +454,7 @@
     const valueProcs = procs.filter(isValueProc);
     if (w.resultStreak % 2 === 0 && rank(s, 'mirror') && valueProcs.length > 0) { const p = valueProcs[valueProcs.length - 1]; flat(s, w, 'mirror', p.after - p.before, procs); }
     refreshValue(s, w);
+    rollDuplicate(s, w, procs);
   }
 
   // ---------- 一局 ----------
@@ -409,6 +465,8 @@
     const s = {
       cfg, rng: opts.seed == null ? Math.random : mulberry32(opts.seed),
       clock: opts.clock || null,
+      earned: new Set(opts.unlocks === 'all' ? cfg.achievements.map(a => a.id) : (opts.unlocks || [])), newlyEarned: [], onEarn: opts.onEarn || null,
+      overpaidTriple: false, lastRagePaid: false, merchantSoldOut: false, endlessPaidTributes: 0,
       phase: 'round', round: 1, misses: 0, totalMisses: 0, cleared: false, endless: false, ended: false, endReason: null, won: false,
       wallet: 0, credits: 0, goldEarned: 0, breakGoldEarned: 0,
       relics: [], offers: [], starterPending: false, shopping: false, rerolls: 0, paidRerolls: 0, freeRerollUsedRound: 0, hookUsed: false,
@@ -454,16 +512,19 @@
     s.ordersLeft = swordSupply(s); s.delivered = 0; s.offered = []; s.undo = null;
     for (const w of s.swords) refreshValue(s, w);
     const supply = swordSupply(s);
+    const parents = shuffle(s, [0, 1, 2]); // 原作每批發劍的母系互不相同
     for (let i = 0; i < supply; i++) {
-      const w = newSword(s, i === 0 ? s.supplyGrade : s.supplyAllGrade);
+      const w = newSword(s, i === 0 ? s.supplyGrade : s.supplyAllGrade, 'basic', parents[i % 3]);
       w.place = 'rack'; w.heated = false; w.issuedRound = s.round;
       s.swords.push(w);
       s.bestGrade = Math.max(s.bestGrade, w.grade);
+      observeSword(s, w);
     }
     s.phase = 'round';
   }
 
   // ---------- 遺物商店 ----------
+  function shuffle(s, arr) { for (let i = arr.length - 1; i > 0; i--) { const j = Math.floor(s.rng() * (i + 1)); const t = arr[i]; arr[i] = arr[j]; arr[j] = t; } return arr; }
   function openStarterRelics(s) {
     const pool = s.cfg.starterPool.slice();
     s.offers = [];
@@ -477,7 +538,7 @@
   }
   function generateOffers(s) {
     const round = s.round;
-    const pool = s.cfg.items.filter(i => !i.consumable && !i.excluded && i.min <= round && !s.relics.includes(i.id));
+    const pool = s.cfg.items.filter(i => !i.consumable && !i.excluded && i.min <= round && hasUnlock(s, i.unlock) && !s.relics.includes(i.id));
     s.offers = [];
     for (let n = 0; n < 3 && pool.length; n++) {
       const r1 = s.rng();
@@ -571,8 +632,12 @@
     if (!isMerchantRound(s.round)) { s.merchant = null; return; }
     const n = (s.round < 6 ? 4 : s.round < 15 ? 5 : 6) + 2 * rank(s, 'ghostledger');
     const offers = [];
-    const sword = merchantOffer(s, 'sword', 0.4, 700); sword.stock = basicSwordStock(Math.floor(s.round / 3)) + 2 * rank(s, 'silverpermit'); offers.push(sword);
-    s.rng(); // 原作第二格是特殊劍，本版不做；吃掉同一個亂數保持對齊
+    const sword = merchantOffer(s, 'sword', 0.4, 700); sword.stock = basicSwordStock(Math.floor(s.round / 3)) + 2 * rank(s, 'silverpermit'); sword.grade = 0; offers.push(sword);
+    // 第二格：特殊劍（古木／海魚／葬儀隨機一種），基礎價值 ×2；第 9 回合起從 +2 開始、第 15 回合起從 +4 開始
+    const g2 = s.round >= 9 ? (s.round < 15 ? 2 : 4) : 0;
+    const r3 = s.rng();
+    const special = merchantOffer(s, r3 < 1 / 3 ? 'seafood' : r3 < 2 / 3 ? 'worldtree' : 'funerary', 0.65, 1100, 1.75 * (g2 === 2 ? 1.6 : g2 === 0 ? 1.0 : 2.4));
+    special.grade = g2; offers.push(special);
     let list = s.cfg.items.filter(x => x.consumable && x.min <= s.round && (x.id !== 'oblivion' || (s.oblivionBought === 0 && s.oblivionUsed === 0 && s.misses > 0)));
     for (let k = 2; k < n; k++) {
       let def;
@@ -602,15 +667,17 @@
     const price = o.price;
     s.wallet -= price; o.purchases++; o.sold = o.purchases >= Math.max(1, o.stock); s.undo = null;
     if (!o.sold) o.price = Math.ceil(o.firstPrice * Math.pow(3, o.purchases) / 10) * 10;
-    if (o.id === 'sword') {
-      const w = newSword(s, 0); w.place = 'rack'; w.heated = false; w.issuedRound = s.round; s.swords.push(w);
-      s.stats.swordsBought++;
+    if (o.id === 'sword' || isSwordKind(o.id)) {
+      const w = newSword(s, o.grade || 0, o.id === 'sword' ? 'basic' : o.id); w.place = 'rack'; w.heated = false; w.issuedRound = s.round; s.swords.push(w);
+      s.stats.swordsBought++; s.bestGrade = Math.max(s.bestGrade, w.grade); observeSword(s, w);
     }
     else if (o.id === 'delivery') s.deliveryBonus += 2 * o.quantity;
     else if (o.id === 'oblivion') { s.misses--; s.oblivionBought++; s.oblivionUsed++; }
     else s.consumables[o.id] = (s.consumables[o.id] || 0) + o.quantity;
+    if (s.merchant.offers.length && s.merchant.offers.every(x => x.sold)) s.merchantSoldOut = true;
     return { ok: true, price, id: o.id };
   }
+  function isSwordKind(id) { return id === 'worldtree' || id === 'seafood' || id === 'funerary'; }
 
   // ---------- 消耗品 ----------
   function useConsumable(s, id) {
@@ -691,7 +758,7 @@
     apply(s, w, raw, fever, procs);
     let shown = raw;
     if (raw === 'break' && !w.broken) shown = 'saved';
-    if (!w.broken) s.bestGrade = Math.max(s.bestGrade, w.grade);
+    if (!w.broken) { s.bestGrade = Math.max(s.bestGrade, w.grade); observeSword(s, w); resolveDuplicate(s, w); }
     if (w.broken) {
       s.swords.splice(s.swords.indexOf(w), 1); s.anvil = null;
       s.ordersLeft = Math.max(0, s.ordersLeft - 1);
@@ -737,6 +804,8 @@
     const q = quota(s), tribute = s.delivered;
     const won = tribute >= q;
     const carried = s.swords.length;
+    if (q > 0 && tribute >= q * 3) s.overpaidTriple = true;
+    if (won && s.misses === 2) s.lastRagePaid = true;
     if (won && s.endless) s.endlessPaidTributes = (s.endlessPaidTributes || 0) + 1;
     if (rank(s, 'royalchange')) s.nextTributeCredit = round0(Math.min(Math.max(0, tribute - q) * 0.3, baseQuota(s.cfg, s.round + 1) * (rank(s, 'letter') ? 0.9 : 1.0) * 0.3));
     if (!won) { s.misses++; s.totalMisses++; if (rank(s, 'mourning')) s.mourningGreatTickets = inc(s.mourningGreatTickets); }
@@ -750,6 +819,9 @@
     let dead = s.misses >= 3;
     if (dead && rank(s, 'dragonpardon')) { s.relics.splice(s.relics.indexOf('dragonpardon'), 1); s.misses = 2; dead = false; s.pardonTriggered = true; }
     if (deadline) s.cleared = !dead;
+    if (s.cleared) earn(s, 'FORGE_CLEAR');
+    if (dead) earn(s, 'FORGE_FIRSTDEATH');
+    observeRun(s);
     s.previousTributeSucceeded = won;
     s.lastSettle = { round: s.round, quota: q, tribute, passed: won, gold: Math.max(0, tribute), carried, misses: s.misses, items: s.offered.map(x => ({ grade: x.grade, value: x.value, scrap: !!x.scrap })), contractDone: deadline && !dead, pardon: s.pardonTriggered, credit: s.nextTributeCredit };
     s.history.push({ round: s.round, quota: q, tribute, passed: won, best: s.roundOfferedGrade });
@@ -774,12 +846,12 @@
       totalTribute: s.totalTribute, bestGrade: s.bestGrade, wallet: s.wallet, swordsLeft: s.swords.length,
       strikes: s.stats.strikes, breaks: s.stats.breaks, fevers: s.stats.fevers, delivered: s.stats.delivered, deposits: s.stats.deposits, takebacks: s.stats.takebacks,
       rerolls: s.stats.rerolls, swordsBought: s.stats.swordsBought, consumablesUsed: s.stats.consumablesUsed, rewinds: s.stats.rewinds,
-      relics: s.relics.slice(), route: s.route.slice(), history: s.history.slice(),
+      relics: s.relics.slice(), route: s.route.slice(), history: s.history.slice(), earned: Array.from(s.earned),
     };
   }
 
   return {
-    OUTCOMES, LABEL, BASELINE, mulberry32, item, rank, money,
+    OUTCOMES, LABEL, BASELINE, mulberry32, item, rank, money, family, lineName, isSpecial, isSwordKind, hasUnlock, earn,
     quota, baseQuota, valueOf, chances, ticketPaper, feverStrikes, feverSeconds, speedOf, strikeInterval, inFever, feverRemaining, expireFever,
     swordSupply, pendingSwords, anvilSword, rackSwords, findSword, bestRackSword,
     newRun, beginRound, takeSword, putOnAnvil, rackAnvil, strike, deliver, takeBack, depositSword, depositCurrent, settle, nextRound, endRun,

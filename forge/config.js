@@ -99,7 +99,7 @@
     { id: 'endlessaxle', name: '永軸', family: '特殊劍', rarity: 2, tier: 2, price: 4, min: 7, consumable: false, unlock: 'FORGE20_SAW', text: '每 2 次成功額外 +1 級' },
     { id: 'dragonheart', name: '龍心', family: '特殊劍', rarity: 2, tier: 2, price: 4, min: 8, consumable: false, unlock: 'FORGE20_DRAGON', text: '+7 以上每次成功或大成功，劍價值 ×1.15' },
     { id: 'perfectcore', name: '魔核', family: '特殊劍', rarity: 2, tier: 2, price: 4, min: 7, consumable: false, unlock: 'FORGE20_RUNE', text: '入神期間大成功籤 +6' },
-    { id: 'twinseal', name: 'twinseal', family: '特殊劍', rarity: 2, tier: 2, price: 4, min: 8, consumable: false, unlock: 'FORGE20_SPLIT', excluded: true, why: '複製劍需要劍架', text: '' },
+    { id: 'twinseal', name: '雙生印', family: '特殊劍', rarity: 2, tier: 2, price: 4, min: 8, consumable: false, unlock: 'FORGE20_SPLIT', text: '每一鎚後，鐵砧上的劍有 2% 機率複製一把（同等級、同狀態，充能歸零）' },
     { id: 'eternalseed', name: '永種', family: '特殊劍', rarity: 2, tier: 2, price: 4, min: 7, consumable: false, unlock: 'FORGE20_WORLDTREE', text: '維持籤 +6；每次維持，劍基礎價值 +40 G' },
     { id: 'deeppearl', name: '深珠', family: '特殊劍', rarity: 2, tier: 2, price: 4, min: 7, consumable: false, unlock: 'FORGE20_FISH', text: '損傷籤 +3；每把劍前 2 次損傷不掉級' },
     { id: 'funeralledger', name: '殯帳', family: '成就', rarity: 2, tier: 0, price: 4, min: 8, consumable: false, unlock: 'FORGE20_FUNERARY', text: '+7 以上的劍破壞時，下回合多發 1 把，每回合最多 2 把' },
@@ -121,8 +121,33 @@
     breakCurve: [0, 0.018, 0.059, 0.129, 0.248, 0.297, 0.347, 0.383, 0.418, 0.443, 0.467, 0.491, 0.505, 0.519, 0.532, 0.545, 0.558, 0.576, 0.594, 0.612, 0.63, 0.639, 0.648, 0.657, 0.666, 0.675, 0.684, 0.693, 0.702, 0.711, 0.72],
     relicSlots: 8,
     starterPool: ['nail', 'seal', 'coin', 'hold', 'repair', 'rage', 'shard', 'spark'],
+    // 成就：family 是劍系（1 到 6 基礎劍的 3 母系 × 2 分支，7 古木、8 海魚、9 葬儀），grade 是要到的等級；relic 是解鎖的遺物。
+    achievements: [
+      { id: 'FORGE20_CITADEL', name: '城塞劍之極', text: '把城塞劍鍛到 +20', relic: 'cornerstone', family: 1, grade: 20 },
+      { id: 'FORGE20_HOLY', name: '曙光劍之極', text: '把曙光劍鍛到 +20', relic: 'dawnsheath', family: 2, grade: 20 },
+      { id: 'FORGE20_SAW', name: '鋸刃劍之極', text: '把鋸刃劍鍛到 +20', relic: 'endlessaxle', family: 3, grade: 20 },
+      { id: 'FORGE20_DRAGON', name: '龍牙劍之極', text: '把龍牙劍鍛到 +20', relic: 'dragonheart', family: 4, grade: 20 },
+      { id: 'FORGE20_RUNE', name: '符文劍之極', text: '把符文劍鍛到 +20', relic: 'perfectcore', family: 5, grade: 20 },
+      { id: 'FORGE20_SPLIT', name: '分裂劍之極', text: '把分裂劍鍛到 +20', relic: 'twinseal', family: 6, grade: 20 },
+      { id: 'FORGE20_WORLDTREE', name: '古木劍之極', text: '把古木劍鍛到 +20', relic: 'eternalseed', family: 7, grade: 20 },
+      { id: 'FORGE20_FISH', name: '海魚劍之極', text: '把海魚劍鍛到 +20', relic: 'deeppearl', family: 8, grade: 20 },
+      { id: 'FORGE20_FUNERARY', name: '葬儀劍之極', text: '把葬儀劍鍛到 +20', relic: 'funeralledger', family: 9, grade: 20 },
+      { id: 'FORGE_FIRST10', name: '再敲一下？', text: '第一次把劍鍛到 +10', relic: '', family: -1, grade: 999 },
+      { id: 'FORGE_FIRSTDEATH', name: '徵新人', text: '第一次被龍吃掉', relic: '', family: -1, grade: 999 },
+      { id: 'FORGE_FIRSTFRENZY', name: '手比腦快', text: '第一次進入入神', relic: '', family: -1, grade: 999 },
+      { id: 'FORGE_CLEAR', name: '下班了', text: '撐過第 21 回合，完成契約', relic: 'sicklehammer', family: -1, grade: 999 },
+      { id: 'FORGE_BROKEN10', name: '手滑', text: '一局碎 10 把劍', relic: 'butterfingers', family: -1, grade: 999 },
+      { id: 'FORGE_FRENZY5', name: '沒有下班', text: '一局入神 5 次', relic: 'everwick', family: -1, grade: 999 },
+      { id: 'FORGE_TRIPLETRIBUTE', name: '不用找了', text: '一次上貢達到配額的 3 倍', relic: 'royalchange', family: -1, grade: 999 },
+      { id: 'FORGE_LASTCHANCE', name: '最後一次機會', text: '怒氣 2 的時候足額上貢', relic: 'dragonpardon', family: -1, grade: 999 },
+      { id: 'FORGE_SOLDOUT', name: '全包了', text: '一次商人來訪買光所有商品', relic: 'ghostledger', family: -1, grade: 999 },
+      { id: 'FORGE_OVERTIME3', name: '終身職', text: '契約完成後再足額上貢 3 次', relic: 'lifecontract', family: -1, grade: 999 },
+    ],
+    // 劍系名稱：+6 前只叫鐵劍，+6 起看得出母系，+10 起看得出分支。特殊劍一開始就看得出。
+    lines: {"generic": "鐵劍", "groups": ["厚鐵劍", "利刃劍", "魔紋劍"], "names": {"1": "城塞劍", "2": "曙光劍", "3": "鋸刃劍", "4": "龍牙劍", "5": "符文劍", "6": "分裂劍", "7": "古木劍", "8": "海魚劍", "9": "葬儀劍"}, "special": {"worldtree": "古木劍", "seafood": "海魚劍", "funerary": "葬儀劍"}},
     items,
     itemsById: Object.fromEntries(items.map(i => [i.id, i])),
+    get achievementsById() { return Object.fromEntries(this.achievements.map(a => [a.id, a])); },
   };
   return cfg;
 });

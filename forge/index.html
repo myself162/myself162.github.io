@@ -198,6 +198,11 @@
   </div>
 
   <details>
+    <summary id="achTitle">成就</summary>
+    <ul id="achList"></ul>
+  </details>
+
+  <details>
     <summary>規則</summary>
     <ul id="rules"></ul>
   </details>
@@ -240,6 +245,12 @@
   }
   function saveRecords(r) { try { localStorage.setItem(KEY, JSON.stringify(r)); } catch (e) {} }
   let rec = loadRecords();
+  // 成就跨局保存。
+  const ACH_KEY = 'forge-proto-achievements-v1';
+  function loadAch() { try { const a = JSON.parse(localStorage.getItem(ACH_KEY)); if (Array.isArray(a)) return a; } catch (e) {} return []; }
+  function saveAch(list) { try { localStorage.setItem(ACH_KEY, JSON.stringify(list)); } catch (e) {} }
+  let earned = loadAch();
+  function swordName(w) { return E.lineName(cfg, w); }
 
   const name = id => { const d = E.item(cfg, id); return d ? d.name : (id === 'fever' ? '入神' : id === 'sword' ? '基礎劍' : id); };
   let noticeTimer = 0;
@@ -266,7 +277,7 @@
     const need = q - s.delivered, rack = E.rackSwords(s), total = s.swords.length;
     $('swords').innerHTML = '手上共 <b>' + total + '</b> 把劍（鐵砧 ' + (s.weapon ? 1 : 0) + '，架上 ' + rack.length + '）　' + (need > 0 ? '還差 <b>' + money(need) + '</b>' : '<span style="color:var(--green)">已達標</span>，多的都是金幣') + (E.isMerchantRound(s.round) && s.merchant ? '　<span style="color:var(--gold)">商人來了</span>' : '');
     $('offeredList').innerHTML = s.offered.length ? '<div class="h">貢品窗（搖鈴前可取回）</div>' + s.offered.map(x => '<div class="it' + (x.scrap ? ' scrap' : '') + '"><span class="g">' + (x.scrap ? '廢鐵' : '+' + x.grade) + '</span><span class="v">' + money(x.value) + ' G</span>' + (x.scrap ? '' : '<button data-takeback="' + x.serial + '">取回</button>') + '</div>').join('') : '';
-    $('rackList').innerHTML = rack.length ? '<div class="h">劍架（沒上貢的劍會帶到下一回合）</div>' + rack.slice().sort((a, b) => b.grade - a.grade).map(w => '<div class="it"><span class="g">+' + w.grade + '</span><span class="v">' + money(w.value) + ' G</span><span class="m">' + (w.strikes ? '鎚 ' + w.strikes + '・充能 ' + w.effects.charge : '新') + (w.issuedRound < s.round ? '・R' + w.issuedRound : '') + '</span><button data-anvil="' + w.serial + '">上鐵砧</button><button data-deliver="' + w.serial + '">上貢</button><button data-deposit="' + w.serial + '">投入</button></div>').join('') : '';
+    $('rackList').innerHTML = rack.length ? '<div class="h">劍架（沒上貢的劍會帶到下一回合）</div>' + rack.slice().sort((a, b) => b.grade - a.grade).map(w => '<div class="it"><span class="g">+' + w.grade + '</span><span class="v">' + money(w.value) + ' G</span><span class="m">' + swordName(w) + '・' + (w.strikes ? '鎚 ' + w.strikes + '・充能 ' + w.effects.charge : '新') + (w.issuedRound < s.round ? '・R' + w.issuedRound : '') + '</span><button data-anvil="' + w.serial + '">上鐵砧</button><button data-deliver="' + w.serial + '">上貢</button><button data-deposit="' + w.serial + '">投入</button></div>').join('') : '';
     $('btnShop').disabled = !inRound || s.starterPending;
     $('btnShop').classList.toggle('on', shopOpen);
     $('btnBell').disabled = !inRound || s.starterPending;
@@ -283,7 +294,14 @@
     for (let i = s.relics.length; i < cfg.relicSlots; i++) chips += '<span class="chip empty">空</span>';
     $('chips').innerHTML = chips;
 
-    renderOffer(); renderSettle(); renderEnd(); renderRecords();
+    renderOffer(); renderSettle(); renderEnd(); renderRecords(); renderAchievements();
+    while (s.newlyEarned.length) { const a = cfg.achievementsById[s.newlyEarned.shift()]; if (a) notify('成就：' + a.name + (a.relic ? '　解鎖遺物「' + name(a.relic) + '」' : '')); }
+  }
+
+  function renderAchievements() {
+    const total = cfg.achievements.length, have = cfg.achievements.filter(a => s.earned.has(a.id)).length;
+    $('achTitle').textContent = '成就 ' + have + '/' + total + '（解鎖的遺物才會進商店）';
+    $('achList').innerHTML = cfg.achievements.map(a => '<li' + (s.earned.has(a.id) ? ' style="color:var(--green)"' : '') + '>' + (s.earned.has(a.id) ? '✓ ' : '○ ') + a.name + '：' + esc(a.text) + (a.relic ? '　→ ' + name(a.relic) : '') + '</li>').join('');
   }
 
   function relicState(id) {
@@ -328,7 +346,7 @@
       m += '<h3>商人（每 3 回合）</h3>';
       m += s.merchant.offers.map((o, i) => {
         const left = E.merchantRemaining(o);
-        const d = o.id === 'sword' ? { name: '基礎劍', family: '武器', text: '多一把 +0 的劍' } : E.item(cfg, o.id);
+        const d = o.id === 'sword' ? { name: '基礎劍', family: '武器', text: '多一把 +0 的劍' } : E.isSwordKind(o.id) ? { name: cfg.lines.special[o.id], family: '特殊劍', text: '基礎價值 ×2' + (o.grade ? '，從 +' + o.grade + ' 開始' : '') + '。鍛到 +20 有成就' } : E.item(cfg, o.id);
         const extra = '<span class="price gold">' + (left ? money(o.price) + ' 金幣・剩 ' + left : '賣完') + '</span>';
         const can = left > 0 && s.wallet >= o.price;
         return '<button class="card' + (left ? (can ? '' : ' cant') : ' sold') + '" data-merchant="' + i + '" ' + (left ? '' : 'disabled') + '>' + cardInner(d, extra) + '</button>';
@@ -366,7 +384,7 @@
     if (e.diceReady) sub.push('盲骰：下一鎚大成功 +3');
     const charge = fever ? '<div class="charge"><span>入神中</span><div class="bar"><i id="feverBar" style="width:' + (100 * E.feverRemaining(s, w) / Math.max(0.01, w.feverTotal)) + '%"></i></div><span id="feverText">剩 ' + E.feverRemaining(s, w).toFixed(1) + ' 秒</span></div>'
       : '<div class="charge"><span>充能</span><div class="bar"><i style="width:' + (10 * e.charge) + '%"></i></div><span>' + e.charge + '/10' + (e.charge >= 10 ? '　下一鎚入神' : '') + '</span></div>';
-    $('weaponBody').innerHTML = '<div class="grade"><span>+' + w.grade + '</span><small>第 ' + w.serial + ' 把</small><span class="val">' + money(w.value) + ' G</span></div><div class="sub">' + sub.join('　') + '</div>' + charge;
+    $('weaponBody').innerHTML = '<div class="grade"><span>+' + w.grade + '</span><small>' + swordName(w) + '・第 ' + w.serial + ' 把' + (E.isSpecial(w) ? '・基礎價值 ×2' : '') + '</small><span class="val">' + money(w.value) + ' G</span></div><div class="sub">' + sub.join('　') + '</div>' + charge;
     $('btnStrike').textContent = '敲';
     strikeAllowed = (s.phase === 'round' && !s.ended && !s.starterPending) && w.grade < cfg.maxGrade;
     $('btnStrike').disabled = !strikeAllowed;
@@ -500,7 +518,7 @@
     }
     html += '<div style="margin-top:8px"><button class="small" id="btnClear">清除紀錄</button>　<button class="small" id="btnQuit">放棄這一局</button></div>';
     $('records').innerHTML = html;
-    $('btnClear').onclick = () => { if (confirm('清除所有紀錄？')) { rec = { bestScore: 0, bestGrade: 0, bestTribute: 0, runs: 0, cleared: 0, history: [] }; saveRecords(rec); render(); } };
+    $('btnClear').onclick = () => { if (confirm('清除所有紀錄和成就？')) { rec = { bestScore: 0, bestGrade: 0, bestTribute: 0, runs: 0, cleared: 0, history: [] }; saveRecords(rec); earned = []; saveAch(earned); s.earned.clear(); render(); } };
     $('btnQuit').onclick = () => { if (!s.ended && confirm('放棄這一局？分數以目前達標回合數計。')) { E.endRun(s); render(); } };
   }
 
@@ -509,7 +527,8 @@
       '一局是連續回合。契約 ' + cfg.contractRound + ' 回合，達標後怒氣歸零進無盡。上貢不足累計 3 次，局結束。分數 = 達標回合數。',
       '每回合發 3 把劍，鎚數不限。劍是實體：沒上貢、沒碎的劍會帶到下一回合，可以跨回合專養一把。鐵砧一次一把，空了就從劍架選，不會自動放。價值 = 320 × 1.5^等級，大成功時價值跳 ×2.5。',
       '上貢是把劍放進貢品窗，搖鈴前隨時可以取回。貢品總值 ≥ 配額就達標，而且全額變金幣。',
-      '商店整回合都開著：遺物用劍幣（把劍投進販賣機換，1 把 1 幣），重抽用金幣（起價 15% 配額，每次 ×2.5）。商人每 3 回合來一次，賣劍（40% 配額起，每買一把 ×3）和消耗品。',
+      '商店整回合都開著：遺物用劍幣（把劍投進販賣機換，1 把 1 幣），重抽用金幣（起價 15% 配額，每次 ×2.5）。商人每 3 回合來一次，賣劍（40% 配額起，每買一把 ×3）、特殊劍（基礎價值 ×2）和消耗品。',
+      '劍有系譜：基礎劍出生時隨機分到 6 系之一，+6 看得出母系、+10 看得出分支。把某一系的劍鍛到 +20 會解鎖成就和對應的遺物；成就跨局保存，解鎖的遺物才會進商店。',
       '籤是權重，每一鎚獨立抽。籤紙上是張數；破壞籤另外乘上隨等級成長的係數，無遺物時 +4 是 25%、+10 是 47%，鐵砧上的百分比才是真實機率。',
       '節奏跟原作一樣：每鎚冷卻 0.64 秒（速度類遺物會縮短）。入神：每一次普通鎚擊充能 +1，滿 10 下一鎚進入入神 4 秒，期間破壞籤 0，要搶時間敲，最多 7 鎚。',
       '鍵盤：空白鍵／Enter 敲，S 上貢。',
@@ -518,7 +537,7 @@
 
   function doStrike() {
     if (!s.weapon) { if (E.pendingSwords(s) === 0) doBell(); return; }
-    if (now() < nextStrikeAt) return;
+    if (!testFast && now() < nextStrikeAt) return;
     const r = E.strike(s);
     if (!r) return;
     nextStrikeAt = now() + E.strikeInterval(s, r.inFever);
@@ -531,7 +550,10 @@
     if (s.delivered < q && !confirm('貢品 ' + money(s.delivered) + ' 不到配額 ' + money(q) + '，搖鈴會吃一次怒氣。確定？')) return;
     E.settle(s); shopOpen = false; render();
   }
-  function newGame() { s = E.newRun(cfg, { clock: now }); pendingPick = null; shopOpen = false; nextStrikeAt = 0; render(); }
+  function newGame() {
+    s = E.newRun(cfg, { clock: now, unlocks: earned, onEarn: id => { if (!earned.includes(id)) { earned.push(id); saveAch(earned); } } });
+    pendingPick = null; shopOpen = false; nextStrikeAt = 0; render();
+  }
 
   $('btnStrike').onclick = doStrike;
   $('btnDeliver').onclick = doDeliver;
@@ -592,8 +614,9 @@
   renderRules();
   newGame();
   setInterval(tick, 60);
-  // 測試用：讓自動化腳本拿得到目前的局。
-  window.__forge = { get state() { return s; }, render };
+  // 測試用：讓自動化腳本拿得到目前的局，並可關掉冷卻。
+  let testFast = false;
+  window.__forge = { get state() { return s; }, render, fast(v) { testFast = !!v; } };
 })();
 </script>
 </body>
