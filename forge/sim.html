@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>鍛造原型 模擬器</title>
+<style>
+  body { margin: 0; padding: 16px; background: #1b1612; color: #efe6d8; font: 14px/1.5 system-ui, "Noto Sans TC", "Microsoft JhengHei", sans-serif; }
+  .wrap { max-width: 760px; margin: 0 auto; }
+  h1 { font-size: 18px; color: #ffcf7a; margin: 0 0 10px; }
+  form { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; align-items: end; }
+  label { display: block; font-size: 12px; color: #a8998a; }
+  input, select { width: 100%; box-sizing: border-box; padding: 8px; border-radius: 8px; border: 1px solid #4a3c30; background: #27201a; color: #efe6d8; font: inherit; }
+  button { padding: 10px 16px; border: 0; border-radius: 10px; background: #f2a541; color: #2a1b06; font: inherit; font-weight: 700; cursor: pointer; }
+  pre { background: #27201a; border: 1px solid #4a3c30; border-radius: 10px; padding: 12px; overflow: auto; white-space: pre; font-size: 13px; }
+  .hint { color: #a8998a; font-size: 12px; margin: 8px 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>鍛造原型 模擬器</h1>
+  <form id="f" onsubmit="return false">
+    <div><label>局數</label><input id="runs" type="number" value="10000" min="100" step="100"></div>
+    <div><label>種子</label><input id="seed" type="number" value="1"></div>
+    <div><label>收起門檻（破壞率）</label><input id="th" type="number" value="0.35" min="0" max="1" step="0.05"></div>
+    <div><label>拿遺物</label><select id="pick"><option value="random">隨機</option><option value="build">照順序</option><option value="none">全部跳過</option></select></div>
+    <div><label>順序（逗號分隔 id）</label><input id="build" value="gear,sand,hoop,dust,blade"></div>
+    <div><label><input id="hist" type="checkbox" style="width:auto"> 直方圖</label><button id="run" type="button">跑</button></div>
+  </form>
+  <div class="hint">策略很笨：創本局新高且破壞率 ≥ 門檻就收起，否則一直敲。只看結構，不代表人會怎麼玩。遺物 id 見 config.js。</div>
+  <pre id="out">還沒跑。</pre>
+</div>
+<script src="config.js"></script>
+<script src="engine.js"></script>
+<script src="sim-core.js"></script>
+<script>
+  const $ = id => document.getElementById(id);
+  $('run').onclick = () => {
+    $('out').textContent = '跑中…';
+    setTimeout(() => {
+      const t0 = performance.now();
+      const res = ForgeSim.runSim(FORGE_CONFIG, ForgeEngine, {
+        runs: +$('runs').value, seed: +$('seed').value, th: +$('th').value,
+        pick: $('pick').value, build: $('build').value.split(',').map(x => x.trim()).filter(Boolean),
+      });
+      $('out').textContent = ForgeSim.formatReport(res, $('hist').checked) + '\n\n(' + ((performance.now() - t0) / 1000).toFixed(1) + ' 秒)';
+    }, 20);
+  };
+</script>
+</body>
+</html>
