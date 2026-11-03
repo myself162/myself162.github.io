@@ -8,7 +8,7 @@
   :root {
     --bg: #1b1612; --panel: #27201a; --panel2: #332a22; --line: #4a3c30;
     --text: #efe6d8; --muted: #a8998a; --amber: #f2a541; --amber2: #ffcf7a;
-    --red: #e5533d; --green: #6cc46a; --purple: #c38cff; --blue: #7fb6ff;
+    --red: #e5533d; --green: #6cc46a; --purple: #c38cff; --blue: #7fb6ff; --gold: #ffd166;
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.45 system-ui, -apple-system, "Segoe UI", "Noto Sans TC", "Microsoft JhengHei", sans-serif; }
@@ -18,13 +18,29 @@
   header h1 { font-size: 18px; margin: 0; color: var(--amber2); font-weight: 600; }
   header .ver { color: var(--muted); font-size: 12px; }
   .row { display: flex; gap: 8px; }
-  .stat { flex: 1; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; }
-  .stat .k { color: var(--muted); font-size: 12px; }
-  .stat .v { font-size: 20px; font-weight: 700; }
+  .stat { flex: 1; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; min-width: 0; }
+  .stat .k { color: var(--muted); font-size: 12px; white-space: nowrap; }
+  .stat .v { font-size: 20px; font-weight: 700; white-space: nowrap; }
   .stat .v small { font-size: 12px; color: var(--muted); font-weight: 400; }
+  .stat .v.gold { color: var(--gold); } .stat .v.credit { color: var(--blue); }
+  .anger { letter-spacing: 2px; } .anger .on { color: var(--red); } .anger .off { color: var(--line); }
+  .panel { margin-top: 8px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; }
+  .panel h2 { margin: 0 0 6px; font-size: 15px; color: var(--amber2); font-weight: 600; display: flex; justify-content: space-between; align-items: baseline; }
+  .panel h2 span { color: var(--muted); font-size: 12px; font-weight: 400; }
+  .quota { margin-top: 8px; }
+  .quota .bar { height: 12px; background: var(--panel2); border-radius: 6px; overflow: hidden; margin-top: 4px; }
+  .quota .bar i { display: block; height: 100%; background: var(--green); width: 0; transition: width .2s; }
+  .quota .bar i.under { background: var(--amber); }
+  .quota .t { display: flex; justify-content: space-between; font-size: 13px; color: var(--muted); }
+  .quota .t b { color: var(--text); font-size: 15px; }
+  .swords { font-size: 13px; color: var(--muted); margin-top: 6px; }
+  .swords b { color: var(--text); }
+  .tchips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+  .tchips span { background: var(--panel2); border-radius: 6px; padding: 2px 8px; font-size: 12px; }
   .weapon { margin-top: 8px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; position: relative; }
-  .weapon .grade { font-size: 56px; font-weight: 800; line-height: 1; color: var(--amber2); }
-  .weapon .grade small { font-size: 18px; color: var(--muted); font-weight: 500; margin-left: 6px; }
+  .weapon .grade { font-size: 56px; font-weight: 800; line-height: 1; color: var(--amber2); display: flex; align-items: baseline; gap: 10px; }
+  .weapon .grade small { font-size: 16px; color: var(--muted); font-weight: 500; }
+  .weapon .grade .val { font-size: 18px; color: var(--gold); font-weight: 600; margin-left: auto; }
   .weapon .sub { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 6px; color: var(--muted); font-size: 13px; }
   .weapon .sub b { color: var(--text); }
   .charge { margin-top: 8px; display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
@@ -35,7 +51,7 @@
   .weapon.broke { animation: shake .35s; border-color: var(--red); }
   @keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-6px)} 40%{transform:translateX(6px)} 60%{transform:translateX(-4px)} 80%{transform:translateX(4px)} }
   .paper { margin-top: 8px; background: #efe3cc; color: #2a2018; border-radius: 12px; padding: 10px 12px; font-size: 14px; }
-  .paper h2 { margin: 0 0 6px; font-size: 14px; display: flex; justify-content: space-between; font-weight: 700; }
+  .paper h2 { margin: 0 0 6px; font-size: 14px; display: flex; justify-content: space-between; font-weight: 700; color: #2a2018; }
   .paper h2 span { font-weight: 400; color: #6b5a48; }
   .trow { display: grid; grid-template-columns: 48px 32px 52px 1fr; gap: 6px; align-items: center; padding: 3px 0; border-top: 1px dashed #cdbda2; }
   .trow:first-of-type { border-top: 0; }
@@ -48,23 +64,26 @@
   .trow.break .n { color: #b2321f; }
   .paper .legend { margin-top: 6px; font-size: 11px; color: #6b5a48; }
   .paper .legend .x { color: #c23f2c; } .paper .legend .a { color: #2f8f3a; } .paper .legend .w { color: #7b3fcf; }
-  .actions { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 8px; margin-top: 10px; }
+  .actions { display: grid; grid-template-columns: 2fr 1.3fr 1fr; gap: 8px; margin-top: 10px; }
+  .actions2 { display: flex; gap: 8px; margin-top: 8px; }
+  .actions2 button { flex: 1; padding: 10px; font-size: 14px; font-weight: 500; }
   button { font: inherit; border: 0; border-radius: 12px; padding: 14px 10px; cursor: pointer; color: var(--text); background: var(--panel2); font-weight: 600; -webkit-tap-highlight-color: transparent; }
   button:disabled { opacity: .35; cursor: default; }
   button.primary { background: var(--amber); color: #2a1b06; font-size: 22px; padding: 18px 10px; }
   button.primary:active:not(:disabled) { transform: translateY(1px); filter: brightness(.95); }
   button.danger { background: #4a2a24; }
+  button.small { padding: 8px 12px; font-size: 13px; font-weight: 500; }
   .log { margin-top: 10px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 8px 12px; min-height: 60px; }
   .log .e { display: flex; gap: 8px; padding: 4px 0; border-top: 1px solid var(--line); font-size: 14px; }
   .log .e:first-child { border-top: 0; font-size: 16px; }
   .log .o { width: 64px; font-weight: 700; flex: none; }
   .log .o.break { color: var(--red); } .log .o.great { color: var(--green); } .log .o.success { color: var(--amber2); }
-  .log .o.damage { color: #e59a8c; } .log .o.hold { color: var(--muted); } .log .o.saved { color: var(--blue); } .log .o.shelve { color: var(--purple); }
+  .log .o.damage { color: #e59a8c; } .log .o.hold { color: var(--muted); } .log .o.saved { color: var(--blue); }
+  .log .o.deliver { color: var(--gold); } .log .o.deposit { color: var(--blue); } .log .o.settle { color: var(--purple); }
   .log .d { color: var(--muted); flex: 1; }
   .log .d b { color: var(--text); }
   .log .procs { font-size: 12px; color: var(--blue); }
-  .relics { margin-top: 10px; }
-  .relics h3 { margin: 0 0 6px; font-size: 13px; color: var(--muted); font-weight: 500; }
+  .relics h3 { margin: 10px 0 6px; font-size: 13px; color: var(--muted); font-weight: 500; }
   .chips { display: flex; flex-wrap: wrap; gap: 6px; }
   .chip { background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; font-size: 14px; }
   .chip.shield { border-color: var(--blue); }
@@ -78,25 +97,33 @@
   .sheet { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 16px; width: 100%; max-width: 480px; max-height: 92vh; overflow-y: auto; overflow-x: hidden; }
   .sheet h2 { margin: 0 0 4px; font-size: 18px; color: var(--amber2); }
   .sheet .hint { color: var(--muted); font-size: 13px; margin-bottom: 10px; }
-  .card { width: 100%; text-align: left; background: var(--panel2); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; margin-top: 8px; font-weight: 400; }
-  .card .t { font-weight: 700; font-size: 17px; }
-  .card .t .fam { color: var(--muted); font-size: 12px; font-weight: 400; margin-left: 8px; }
+  .card { width: 100%; text-align: left; background: var(--panel2); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; margin-top: 8px; font-weight: 400; display: block; }
+  .card .t { font-weight: 700; font-size: 17px; display: flex; align-items: baseline; gap: 8px; }
+  .card .t .fam { color: var(--muted); font-size: 12px; font-weight: 400; }
   .card .t .fam.shield { color: var(--blue); }
+  .card .t .price { margin-left: auto; color: var(--blue); font-size: 14px; white-space: nowrap; }
   .card .fx { margin-top: 4px; color: var(--green); }
   .card .cost { color: #e59a8c; font-size: 14px; }
   .card.drop { border-color: var(--red); }
+  .card.sold { opacity: .4; }
+  .card.cant { border-style: dashed; }
   .skip { width: 100%; margin-top: 10px; }
-  .end .score { font-size: 64px; font-weight: 800; color: var(--amber2); line-height: 1; margin: 6px 0; }
+  .shoprow { display: flex; gap: 8px; margin-top: 10px; }
+  .shoprow button { flex: 1; padding: 10px 8px; font-size: 14px; font-weight: 500; }
+  .shoprow button b { display: block; font-size: 12px; color: var(--muted); font-weight: 400; }
+  .end .score { font-size: 56px; font-weight: 800; color: var(--amber2); line-height: 1; margin: 6px 0; }
   .end .score small { font-size: 16px; color: var(--muted); font-weight: 500; margin-left: 8px; }
   .end .new { color: var(--green); font-weight: 700; }
   .end dl { display: grid; grid-template-columns: auto 1fr; gap: 2px 14px; margin: 10px 0; font-size: 14px; }
   .end dt { color: var(--muted); } .end dd { margin: 0; }
+  .settle .big { font-size: 28px; font-weight: 800; margin: 6px 0; }
+  .settle .big.ok { color: var(--green); } .settle .big.miss { color: var(--red); }
   .records { margin-top: 14px; border-top: 1px solid var(--line); padding-top: 10px; }
   .records table { width: 100%; border-collapse: collapse; font-size: 13px; }
   .records th, .records td { text-align: left; padding: 4px 6px; border-bottom: 1px solid var(--line); }
   .records th { color: var(--muted); font-weight: 500; }
-  .records td.route { color: var(--muted); }
   .muted { color: var(--muted); }
+  .hide { display: none !important; }
 </style>
 </head>
 <body>
@@ -104,30 +131,57 @@
   <header><h1>鍛造原型</h1><span class="ver" id="ver"></span></header>
 
   <div class="row">
-    <div class="stat"><div class="k">剩餘鎚數</div><div class="v" id="strikes">—</div></div>
-    <div class="stat"><div class="k">本局最高收起</div><div class="v" id="best">0</div></div>
-    <div class="stat"><div class="k">歷史最高</div><div class="v" id="hist">0</div></div>
+    <div class="stat"><div class="k" id="roundK">回合</div><div class="v" id="round">1</div></div>
+    <div class="stat"><div class="k">怒氣</div><div class="v anger" id="anger"></div></div>
+    <div class="stat"><div class="k">金幣</div><div class="v gold" id="wallet">0</div></div>
+    <div class="stat"><div class="k">劍幣</div><div class="v credit" id="credits">0</div></div>
   </div>
 
-  <div class="weapon" id="weapon">
-    <div class="grade"><span id="grade">+0</span><small id="wserial"></small></div>
-    <div class="sub" id="wsub"></div>
-    <div class="charge"><span id="chargeLabel">充能</span><div class="bar"><i id="chargeBar"></i></div><span id="chargeText">0/10</span></div>
+  <!-- 商店階段 -->
+  <div id="shopPanel">
+    <div class="panel">
+      <h2><span style="color:var(--amber2);font-size:15px" id="shopTitle">第 1 回合 準備</span><span id="shopQuota"></span></h2>
+      <div class="swords" id="shopSwords"></div>
+      <div id="shopOffers"></div>
+      <div class="shoprow">
+        <button id="btnReroll">重抽<b id="rerollPrice"></b></button>
+        <button id="btnBuySword">買武器<b id="swordPrice"></b></button>
+        <button id="btnDeposit">投入一把換劍幣<b>本回合少一把</b></button>
+      </div>
+      <button class="primary" id="btnStart" style="width:100%;margin-top:12px">開始鍛造</button>
+    </div>
   </div>
 
-  <div class="paper">
-    <h2>抽籤表 <span id="total"></span></h2>
-    <div id="rows"></div>
-    <div class="legend">基礎 ■ 　<span class="x">✕ 遺物劃掉</span>　<span class="a">■ 遺物新增</span>　<span class="w">■ 只對這把武器</span></div>
-  </div>
+  <!-- 鍛造階段 -->
+  <div id="forgePanel" class="hide">
+    <div class="panel quota">
+      <div class="t"><span>貢品 <b id="tribute">0</b></span><span>配額 <b id="quota">0</b></span></div>
+      <div class="bar"><i id="quotaBar"></i></div>
+      <div class="swords" id="forgeSwords"></div>
+      <div class="tchips" id="tchips"></div>
+    </div>
 
-  <div class="actions">
-    <button class="primary" id="btnStrike">敲</button>
-    <button id="btnShelve">收起</button>
-    <button class="danger" id="btnEnd">結束</button>
-  </div>
+    <div class="weapon" id="weapon">
+      <div class="grade"><span id="grade">+0</span><small id="wserial"></small><span class="val" id="wvalue"></span></div>
+      <div class="sub" id="wsub"></div>
+      <div class="charge"><span id="chargeLabel">充能</span><div class="bar"><i id="chargeBar"></i></div><span id="chargeText">0/10</span></div>
+    </div>
 
-  <div class="log" id="log"></div>
+    <div class="paper">
+      <h2>抽籤表 <span id="total"></span></h2>
+      <div id="rows"></div>
+      <div class="legend">基礎 ■ 　<span class="x">✕ 遺物劃掉</span>　<span class="a">■ 遺物新增</span>　<span class="w">■ 只對這把武器</span></div>
+    </div>
+
+    <div class="actions">
+      <button class="primary" id="btnStrike">敲</button>
+      <button id="btnDeliver">上貢</button>
+      <button class="danger" id="btnSettle">收工</button>
+    </div>
+    <div class="actions2"><button id="btnDepositCur">沒敲過：投入商店換 1 劍幣</button></div>
+
+    <div class="log" id="log"></div>
+  </div>
 
   <div class="relics">
     <h3 id="relicTitle">遺物</h3>
@@ -143,6 +197,7 @@
 </div>
 
 <div class="modal" id="offerModal"><div class="sheet" id="offerSheet"></div></div>
+<div class="modal" id="settleModal"><div class="sheet settle" id="settleSheet"></div></div>
 <div class="modal" id="endModal"><div class="sheet end" id="endSheet"></div></div>
 
 <script src="config.js"></script>
@@ -151,13 +206,13 @@
 (function () {
   const cfg = window.FORGE_CONFIG, E = window.ForgeEngine;
   const $ = id => document.getElementById(id);
-  const KEY = 'forge-proto-records-v1';
-  let s = null, pendingPick = null, lastResult = null;
+  const KEY = 'forge-proto-records-v2';
+  let s = null, pendingPick = null; // pendingPick: { kind: 'starter'|'shop', index }
 
   // ---------- 紀錄 ----------
   function loadRecords() {
     try { const r = JSON.parse(localStorage.getItem(KEY)); if (r && typeof r === 'object') return r; } catch (e) {}
-    return { bestScore: 0, bestTouched: 0, runs: 0, history: [] };
+    return { bestScore: 0, bestGrade: 0, bestTribute: 0, runs: 0, cleared: 0, history: [] };
   }
   function saveRecords(r) { try { localStorage.setItem(KEY, JSON.stringify(r)); } catch (e) {} }
   let rec = loadRecords();
@@ -167,108 +222,150 @@
   function glyphs(ch, n, cls) { n = Math.max(0, n); if (!n) return ''; const cap = 36; const str = ch.repeat(Math.min(n, cap)) + (n > cap ? '…' : ''); return '<span class="' + cls + '">' + str + '</span>'; }
   function pct(x) { return (100 * x).toFixed(1) + '%'; }
   function esc(t) { return String(t).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c])); }
+  function money(n) { return Math.round(n).toLocaleString('en-US'); }
+  function val(g) { return E.value(cfg, g); }
+  function famLabel(d) { return d.family + (d.shield && d.family !== '護盾' ? '・護盾' : ''); }
+  function relicCard(d, extra, cls) {
+    return '<div class="card ' + (cls || '') + '"><div class="t">' + d.name + '<span class="fam' + (d.shield ? ' shield' : '') + '">' + famLabel(d) + '</span>' + (extra || '') + '</div><div class="fx">' + esc(d.text) + '</div><div class="cost">代價：' + esc(d.cost) + '</div></div>';
+  }
 
   // ---------- 畫面 ----------
   function render() {
     $('ver').textContent = cfg.version;
-    const w = s.weapon, t = E.tickets(s), fp = E.feverParams(s);
-    $('strikes').innerHTML = s.strikesLeft + '<small>/' + cfg.strikesPerRun + '</small>';
-    $('best').textContent = s.bestShelved;
-    $('hist').textContent = rec.bestScore;
+    const q = E.quota(cfg, s.round);
+    $('roundK').textContent = s.endless ? '無盡' : '回合（契約 ' + cfg.rounds.contract + '）';
+    $('round').textContent = s.round;
+    $('anger').innerHTML = Array.from({ length: cfg.rounds.maxMisses }, (_, i) => '<span class="' + (i < s.misses ? 'on' : 'off') + '">●</span>').join('');
+    $('wallet').textContent = money(s.wallet);
+    $('credits').textContent = s.credits;
 
-    $('grade').textContent = '+' + w.grade;
-    $('wserial').textContent = '第 ' + w.serial + ' 把';
-    const sub = [];
-    sub.push('本把最高 <b>' + w.peak + '</b>');
-    if (w.scar) sub.push('疤 <b>+' + w.scar + '</b> 張破壞籤');
-    if (w.gearTickets) sub.push('齒輪 <b>+' + w.gearTickets + '</b> 張成功籤');
-    const blade = s.relics.includes('blade'), pact = s.relics.includes('pact');
-    if (blade) sub.push('備用刃 <b>' + (w.bladeUsed ? '已用' : '可用') + '</b>');
-    if (pact) sub.push('血契護盾 <b>' + w.shield + '</b>（損傷 ' + (w.damages % (E.relicDef(cfg, 'pact').damagesPerShield)) + '/' + E.relicDef(cfg, 'pact').damagesPerShield + '）');
-    if (s.relics.includes('slow')) sub.push('慢火維持 <b>' + (w.holds % E.relicDef(cfg, 'slow').holdsNeeded) + '/' + E.relicDef(cfg, 'slow').holdsNeeded + '</b>');
-    $('wsub').innerHTML = sub.join('　');
+    $('shopPanel').classList.toggle('hide', s.phase !== 'shop');
+    $('forgePanel').classList.toggle('hide', s.phase !== 'forge');
+    if (s.phase === 'shop') renderShop(q);
+    if (s.phase === 'forge') renderForge(q);
 
-    const weaponEl = $('weapon');
-    weaponEl.classList.toggle('fever', t.inFever);
-    if (t.inFever) {
-      $('chargeLabel').textContent = '入神中';
-      $('chargeBar').style.width = (100 * w.feverLeft / fp.strikes) + '%';
-      $('chargeText').textContent = '剩 ' + w.feverLeft + ' 鎚';
-    } else {
-      $('chargeLabel').textContent = '充能';
-      $('chargeBar').style.width = (100 * w.charge / fp.threshold) + '%';
-      $('chargeText').textContent = w.charge + '/' + fp.threshold;
-    }
-
-    // 籤紙
-    $('total').textContent = '共 ' + t.total + ' 張';
-    let rows = '';
-    for (const k of E.OUTCOMES) {
-      const base = t.base[k], rl = t.relic[k], wp = t.weapon[k], fin = t.final[k];
-      let g = '';
-      if (k === 'break' && t.inFever) {
-        g = '<span class="fev">入神：破壞籤 0</span>';
-      } else {
-        const removed = Math.min(base, Math.max(0, -rl));
-        const kept = base - removed;
-        const added = Math.max(0, rl);
-        const wAdd = Math.max(0, wp);
-        let extraRemoved = Math.max(0, -rl - removed); // 遺物減超過基礎的部分，吃掉武器加成
-        g = glyphs('■', kept, 'b') + glyphs('✕', removed, 'x') + glyphs('■', added, 'a') + glyphs('■', wAdd - Math.min(wAdd, extraRemoved), 'w');
-        if (k === 'break' && fin > kept + added + wAdd) g += glyphs('■', fin - (kept + added + wAdd), 'b'); // 鐵箍最低 1
-      }
-      rows += '<div class="trow ' + k + '"><div class="n">' + E.LABEL[k] + '</div><div class="c">' + fin + '</div><div class="p">' + pct(t.pct[k]) + '</div><div class="g">' + g + '</div></div>';
-    }
-    $('rows').innerHTML = rows;
-
-    // 按鈕
-    const busy = !!s.offer || s.ended;
-    $('btnStrike').disabled = busy;
-    $('btnShelve').disabled = busy || w.grade <= 0 || t.inFever;
-    $('btnEnd').disabled = busy;
-    $('btnShelve').textContent = t.inFever ? '入神中' : '收起 +' + w.grade;
-
-    // 記錄
-    $('log').innerHTML = s.log.slice(0, 8).map(e => {
-      let d = '';
-      if (e.outcome === 'shelve') d = '收起 <b>+' + e.before + '</b>，換新武器';
-      else if (e.broke) d = '<b>+' + e.before + '</b> 碎了' + (cfg.onBreak === 'endRun' ? '，局結束' : '，換新武器');
-      else d = '+' + e.before + ' → <b>+' + e.after + '</b>' + (e.inFever ? '　<span class="muted">入神</span>' : '');
-      const procs = e.procs && e.procs.length ? '<div class="procs">' + e.procs.map(esc).join('　') + '</div>' : '';
-      return '<div class="e"><div class="o ' + e.outcome + '">' + (E.LABEL[e.outcome] || e.outcome) + '</div><div class="d">' + d + procs + '</div></div>';
-    }).join('') || '<div class="muted">還沒敲。</div>';
-
-    // 遺物
     $('relicTitle').textContent = '遺物 ' + s.relics.length + '/' + cfg.relicSlots + '（護盾位 ' + cfg.shieldSlots + '）';
     let chips = s.relics.map(id => { const d = E.relicDef(cfg, id); return '<span class="chip' + (d.shield ? ' shield' : '') + '" title="' + esc(d.text + '。代價：' + d.cost) + '">' + d.name + (d.shield ? '<span class="st">護盾</span>' : '') + '</span>'; }).join('');
     for (let i = s.relics.length; i < cfg.relicSlots; i++) chips += '<span class="chip empty">空</span>';
     $('chips').innerHTML = chips;
 
     renderOffer();
+    renderSettle();
     renderEnd();
     renderRecords();
   }
 
+  function renderShop(q) {
+    $('shopTitle').textContent = '第 ' + s.round + ' 回合 準備';
+    $('shopQuota').textContent = '本回合配額 ' + money(q);
+    $('shopSwords').innerHTML = '本回合武器 <b>' + s.swordsLeft + '</b> 把（供應 ' + cfg.rounds.supply + '）　劍幣 <b>' + s.credits + '</b>　金幣 <b>' + money(s.wallet) + '</b>';
+    $('shopOffers').innerHTML = s.shop.offers.map((o, i) => {
+      const d = E.relicDef(cfg, o.id);
+      const can = !o.sold && s.credits >= o.price;
+      const extra = '<span class="price">' + (o.sold ? '已售出' : '劍幣 ' + o.price) + '</span>';
+      return '<button class="card' + (o.sold ? ' sold' : (can ? '' : ' cant')) + '" data-buy="' + i + '" ' + (o.sold ? 'disabled' : '') + '>' + relicCard(d, extra).slice('<div class="card ">'.length, -6) + '</button>';
+    }).join('');
+    const rp = E.rerollPrice(s), sp = E.swordPrice(s);
+    $('rerollPrice').textContent = money(rp) + ' 金幣';
+    $('btnReroll').disabled = s.wallet < rp;
+    $('swordPrice').textContent = s.shop.swordStock > 0 ? money(sp) + ' 金幣・剩 ' + s.shop.swordStock : '賣完了';
+    $('btnBuySword').disabled = s.shop.swordStock <= 0 || s.wallet < sp;
+    $('btnDeposit').disabled = s.swordsLeft <= 1;
+  }
+
+  function renderForge(q) {
+    const w = s.weapon, t = E.tickets(s), fp = E.feverParams(s);
+    $('tribute').textContent = money(s.tributeTotal);
+    $('quota').textContent = money(q);
+    const bar = $('quotaBar'); bar.style.width = Math.min(100, 100 * s.tributeTotal / q) + '%'; bar.classList.toggle('under', s.tributeTotal < q);
+    const need = q - s.tributeTotal;
+    $('forgeSwords').innerHTML = '鐵砧上第 <b>' + w.serial + '</b> 把，後面還有 <b>' + s.swordsLeft + '</b> 把　' + (need > 0 ? '還差 <b>' + money(need) + '</b>' : '<span style="color:var(--green)">已達標</span>，多的都是金幣');
+    $('tchips').innerHTML = s.tribute.map(x => '<span>+' + x.grade + '　' + money(x.value) + '</span>').join('');
+
+    $('grade').textContent = '+' + w.grade;
+    $('wserial').textContent = '第 ' + w.serial + ' 把';
+    $('wvalue').textContent = money(val(w.grade)) + ' G';
+    const sub = [];
+    sub.push('本把最高 <b>' + w.peak + '</b>');
+    if (w.scar) sub.push('疤 <b>+' + w.scar + '</b> 張破壞籤');
+    if (w.gearTickets) sub.push('齒輪 <b>+' + w.gearTickets + '</b> 張成功籤');
+    if (s.relics.includes('blade')) sub.push('備用刃 <b>' + (w.bladeUsed ? '已用' : '可用') + '</b>');
+    if (s.relics.includes('pact')) { const p = E.relicDef(cfg, 'pact'); sub.push('血契護盾 <b>' + w.shield + '</b>（損傷 ' + (w.damages % p.damagesPerShield) + '/' + p.damagesPerShield + '）'); }
+    if (s.relics.includes('slow')) sub.push('慢火維持 <b>' + (w.holds % E.relicDef(cfg, 'slow').holdsNeeded) + '/' + E.relicDef(cfg, 'slow').holdsNeeded + '</b>');
+    $('wsub').innerHTML = sub.join('　');
+
+    $('weapon').classList.toggle('fever', t.inFever);
+    if (t.inFever) { $('chargeLabel').textContent = '入神中'; $('chargeBar').style.width = (100 * w.feverLeft / fp.strikes) + '%'; $('chargeText').textContent = '剩 ' + w.feverLeft + ' 鎚'; }
+    else { $('chargeLabel').textContent = '充能'; $('chargeBar').style.width = (100 * w.charge / fp.threshold) + '%'; $('chargeText').textContent = w.charge + '/' + fp.threshold; }
+
+    $('total').textContent = '共 ' + t.total + ' 張';
+    let rows = '';
+    for (const k of E.OUTCOMES) {
+      const base = t.base[k], rl = t.relic[k], wp = t.weapon[k], fin = t.final[k];
+      let g = '';
+      if (k === 'break' && t.inFever) g = '<span class="fev">入神：破壞籤 0</span>';
+      else {
+        const removed = Math.min(base, Math.max(0, -rl)), kept = base - removed, added = Math.max(0, rl), wAdd = Math.max(0, wp);
+        const extraRemoved = Math.max(0, -rl - removed);
+        g = glyphs('■', kept, 'b') + glyphs('✕', removed, 'x') + glyphs('■', added, 'a') + glyphs('■', wAdd - Math.min(wAdd, extraRemoved), 'w');
+        if (k === 'break' && fin > kept + added + wAdd) g += glyphs('■', fin - (kept + added + wAdd), 'b');
+      }
+      rows += '<div class="trow ' + k + '"><div class="n">' + E.LABEL[k] + '</div><div class="c">' + fin + '</div><div class="p">' + pct(t.pct[k]) + '</div><div class="g">' + g + '</div></div>';
+    }
+    $('rows').innerHTML = rows;
+
+    $('btnStrike').disabled = false;
+    $('btnDeliver').disabled = t.inFever || w.grade <= 0;
+    $('btnDeliver').textContent = t.inFever ? '入神中' : '上貢 +' + w.grade;
+    $('btnDepositCur').classList.toggle('hide', w.strikes > 0);
+
+    $('log').innerHTML = s.log.filter(e => e.kind !== 'settle').slice(0, 8).map(e => {
+      let d = '';
+      if (e.kind === 'deliver') d = '<b>+' + e.before + '</b> 上貢，<b>' + money(e.value) + '</b> G';
+      else if (e.kind === 'deposit') d = '沒敲過的武器投入商店，劍幣 +1';
+      else if (e.broke) d = '<b>+' + e.before + '</b> 碎了，少一把';
+      else d = '+' + e.before + ' → <b>+' + e.after + '</b>' + (e.inFever ? '　<span class="muted">入神</span>' : '');
+      const procs = e.procs && e.procs.length ? '<div class="procs">' + e.procs.map(esc).join('　') + '</div>' : '';
+      return '<div class="e"><div class="o ' + e.outcome + '">' + (E.LABEL[e.outcome] || e.outcome) + '</div><div class="d">' + d + procs + '</div></div>';
+    }).join('') || '<div class="muted">還沒敲。</div>';
+  }
+
   function renderOffer() {
     const m = $('offerModal');
-    if (!s.offer) { m.classList.remove('on'); pendingPick = null; return; }
+    const starter = !!s.offer;
+    if (!starter && !pendingPick) { m.classList.remove('on'); return; }
     m.classList.add('on');
-    const at = s.offer.at === 'start' ? '開局' : '本局首次到達 +' + s.offer.at;
     let html = '';
-    if (pendingPick == null) {
-      html += '<h2>' + at + '：遺物三選一</h2><div class="hint">遺物 ' + s.relics.length + '/' + cfg.relicSlots + '。護盾類同時只能持有 ' + cfg.shieldSlots + ' 個，拿新護盾會換掉舊的。</div>';
-      s.offer.ids.forEach((id, i) => {
-        const d = E.relicDef(cfg, id);
-        html += '<button class="card" data-pick="' + i + '"><div class="t">' + d.name + '<span class="fam' + (d.shield ? ' shield' : '') + '">' + d.family + (d.shield && d.family !== '護盾' ? '・護盾' : '') + '</span></div><div class="fx">' + esc(d.text) + '</div><div class="cost">代價：' + esc(d.cost) + '</div></button>';
-      });
-      html += '<button class="skip" data-skip="1">跳過</button>';
-    } else {
-      const d = E.relicDef(cfg, s.offer.ids[pendingPick]);
+    if (pendingPick) {
+      const id = pendingPick.kind === 'starter' ? s.offer.ids[pendingPick.index] : s.shop.offers[pendingPick.index].id;
+      const d = E.relicDef(cfg, id);
       html += '<h2>遺物格滿了</h2><div class="hint">要拿「' + d.name + '」，得換掉一個：</div>';
-      s.relics.forEach(id => { const h = E.relicDef(cfg, id); html += '<button class="card drop" data-drop="' + id + '"><div class="t">換掉 ' + h.name + '</div><div class="fx">' + esc(h.text) + '</div></button>'; });
+      s.relics.forEach(rid => { const h = E.relicDef(cfg, rid); html += '<button class="card drop" data-drop="' + rid + '"><div class="t">換掉 ' + h.name + '</div><div class="fx">' + esc(h.text) + '</div></button>'; });
       html += '<button class="skip" data-back="1">返回</button>';
+    } else {
+      html += '<h2>開局：免費三選一</h2><div class="hint">之後的遺物要在每回合開始的商店用劍幣買。護盾類同時只能持有 ' + cfg.shieldSlots + ' 個。</div>';
+      s.offer.ids.forEach((id, i) => { const d = E.relicDef(cfg, id); html += '<button class="card" data-pick="' + i + '">' + relicCard(d).slice('<div class="card ">'.length, -6) + '</button>'; });
+      html += '<button class="skip" data-skip="1">跳過</button>';
     }
     $('offerSheet').innerHTML = html;
+  }
+
+  function renderSettle() {
+    const m = $('settleModal');
+    if (s.phase !== 'settle' || s.ended) { m.classList.remove('on'); return; }
+    m.classList.add('on');
+    const L = s.lastSettle;
+    const nextQ = E.quota(cfg, s.round + 1);
+    $('settleSheet').innerHTML =
+      '<h2>第 ' + L.round + ' 回合結算</h2>' +
+      '<div class="big ' + (L.passed ? 'ok' : 'miss') + '">' + (L.passed ? '達標' : '不足') + '　<span style="font-size:16px;color:var(--text);font-weight:500">貢品 ' + money(L.tribute) + ' / 配額 ' + money(L.quota) + '</span></div>' +
+      (L.contractDone ? '<div class="new">契約完成！之後進入無盡，配額每回合 ×' + cfg.quota.endlessGrowth + '。</div>' : '') +
+      '<dl><dt>貢品</dt><dd>' + (L.items.map(x => '+' + x.grade + '（' + money(x.value) + '）').join('、') || '無') + '</dd>' +
+      '<dt>金幣</dt><dd>+' + money(L.gold) + '</dd>' +
+      '<dt>沒用的武器</dt><dd>' + L.unused + ' 把 → 劍幣 +' + L.unused + '</dd>' +
+      '<dt>怒氣</dt><dd>' + L.misses + ' / ' + cfg.rounds.maxMisses + (L.passed ? '' : '　<span style="color:var(--red)">+1</span>') + '</dd></dl>' +
+      '<button class="primary" id="btnNext" style="width:100%">第 ' + (s.round + 1) + ' 回合　配額 ' + money(nextQ) + '</button>';
+    $('btnNext').onclick = () => { E.nextRound(s); render(); };
   }
 
   function renderEnd() {
@@ -277,13 +374,13 @@
     if (!m.classList.contains('on')) commitRecord();
     m.classList.add('on');
     const sm = E.summary(s);
-    const reason = { strikes: '鎚數用完', quit: '主動結束', break: '武器破壞' }[sm.endReason] || '';
-    const route = sm.route.map(r => (r.at === 'start' ? '開局' : '+' + r.at) + '：' + (r.picked ? name(r.picked) + (r.replaced ? '（換掉' + name(r.replaced) + '）' : '') : '跳過')).join('　');
+    const reason = { misses: '怒氣滿了', quit: '主動結束' }[sm.endReason] || '';
+    const route = sm.route.filter(r => r.picked).map(r => (r.at === 'start' ? '開局' : 'R' + r.round) + '：' + name(r.picked) + (r.replaced ? '（換掉' + name(r.replaced) + '）' : '')).join('　');
     $('endSheet').innerHTML =
       '<h2>這一局結束　<span class="muted" style="font-size:13px">' + reason + '</span></h2>' +
-      '<div class="score">' + sm.score + '<small>最高收起</small></div>' +
-      (s._newRecord ? '<div class="new">歷史新高！</div>' : '<div class="muted">歷史最高 ' + rec.bestScore + '</div>') +
-      '<dl><dt>最高觸及</dt><dd>' + sm.touched + '</dd><dt>收起</dt><dd>' + sm.shelved.map(g => '+' + g).join('、') + '</dd><dt>鎚數</dt><dd>' + sm.strikes + '</dd><dt>破壞</dt><dd>' + sm.breaks + ' 次</dd><dt>入神</dt><dd>' + sm.fevers + ' 次</dd><dt>護盾擋下</dt><dd>' + sm.saves + ' 次</dd><dt>路線</dt><dd>' + (route || '無') + '</dd><dt>最終遺物</dt><dd>' + (sm.relics.map(name).join('、') || '無') + '</dd></dl>' +
+      '<div class="score">' + sm.score + '<small>達標回合</small></div>' +
+      (s._newRecord ? '<div class="new">歷史新高！</div>' : '<div class="muted">歷史最高 ' + rec.bestScore + ' 回合</div>') +
+      '<dl><dt>撐到</dt><dd>第 ' + sm.round + ' 回合' + (sm.cleared ? '，契約完成' : '') + '</dd><dt>總上貢</dt><dd>' + money(sm.totalTribute) + ' G</dd><dt>最高武器</dt><dd>+' + sm.bestGrade + '</dd><dt>破壞</dt><dd>' + sm.breaks + ' 次</dd><dt>入神</dt><dd>' + sm.fevers + ' 次</dd><dt>買武器</dt><dd>' + sm.swordsBought + ' 把</dd><dt>路線</dt><dd>' + (route || '無') + '</dd><dt>最終遺物</dt><dd>' + (sm.relics.map(name).join('、') || '無') + '</dd></dl>' +
       '<button class="primary" id="btnAgain" style="width:100%">再來一局</button>';
     $('btnAgain').onclick = newGame;
   }
@@ -294,35 +391,38 @@
     const sm = E.summary(s);
     s._newRecord = sm.score > rec.bestScore;
     rec.bestScore = Math.max(rec.bestScore, sm.score);
-    rec.bestTouched = Math.max(rec.bestTouched, sm.touched);
-    rec.runs++;
+    rec.bestGrade = Math.max(rec.bestGrade, sm.bestGrade);
+    rec.bestTribute = Math.max(rec.bestTribute, sm.totalTribute);
+    rec.runs++; if (sm.cleared) rec.cleared++;
     const d = new Date(), p2 = n => String(n).padStart(2, '0');
-    rec.history.unshift({ date: d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate()) + ' ' + p2(d.getHours()) + ':' + p2(d.getMinutes()), score: sm.score, touched: sm.touched, breaks: sm.breaks, fevers: sm.fevers, route: sm.route.filter(r => r.picked).map(r => r.picked) });
+    rec.history.unshift({ date: d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate()) + ' ' + p2(d.getHours()) + ':' + p2(d.getMinutes()), score: sm.score, grade: sm.bestGrade, tribute: sm.totalTribute, cleared: sm.cleared, relics: sm.relics });
     rec.history = rec.history.slice(0, 20);
     saveRecords(rec);
   }
 
   function renderRecords() {
-    let html = '<h3 class="muted" style="margin:0 0 6px;font-size:13px;font-weight:500">紀錄　局數 ' + rec.runs + '　歷史最高 ' + rec.bestScore + '　最高觸及 ' + rec.bestTouched + '</h3>';
+    let html = '<h3 class="muted" style="margin:0 0 6px;font-size:13px;font-weight:500">紀錄　局數 ' + rec.runs + '　契約完成 ' + rec.cleared + '　最高 ' + rec.bestScore + ' 回合　最高武器 +' + rec.bestGrade + '</h3>';
     if (rec.history.length) {
-      html += '<table><tr><th>時間</th><th>分數</th><th>觸及</th><th>碎</th><th>路線</th></tr>' +
-        rec.history.map(h => '<tr><td>' + h.date.slice(5) + '</td><td><b>' + h.score + '</b></td><td>' + h.touched + '</td><td>' + h.breaks + '</td><td class="route">' + h.route.map(name).join('→') + '</td></tr>').join('') + '</table>';
+      html += '<table><tr><th>時間</th><th>回合</th><th>武器</th><th>總上貢</th><th>遺物</th></tr>' +
+        rec.history.map(h => '<tr><td>' + h.date.slice(5) + '</td><td><b>' + h.score + '</b>' + (h.cleared ? ' ✓' : '') + '</td><td>+' + h.grade + '</td><td>' + money(h.tribute) + '</td><td class="muted">' + (h.relics || []).map(name).join('、') + '</td></tr>').join('') + '</table>';
     }
-    html += '<div style="margin-top:8px"><button id="btnClear" style="padding:8px 12px;font-size:13px">清除紀錄</button></div>';
+    html += '<div style="margin-top:8px"><button class="small" id="btnClear">清除紀錄</button>　<button class="small" id="btnQuit">放棄這一局</button></div>';
     $('records').innerHTML = html;
-    $('btnClear').onclick = () => { if (confirm('清除所有紀錄？')) { rec = { bestScore: 0, bestTouched: 0, runs: 0, history: [] }; saveRecords(rec); render(); } };
+    $('btnClear').onclick = () => { if (confirm('清除所有紀錄？')) { rec = { bestScore: 0, bestGrade: 0, bestTribute: 0, runs: 0, cleared: 0, history: [] }; saveRecords(rec); render(); } };
+    $('btnQuit').onclick = () => { if (!s.ended && confirm('放棄這一局？分數以目前達標回合數計。')) { E.endRun(s); render(); } };
   }
 
   function renderRules() {
     const f = cfg.fever;
     $('rules').innerHTML = [
-      '一局 ' + cfg.strikesPerRun + ' 鎚。每鎚扣 1。鎚數用完，鐵砧上的武器自動收起。',
-      '五種結果：破壞（失去武器）、損傷 ' + cfg.gradeDelta.damage + '、維持 0、成功 +' + cfg.gradeDelta.success + '、大成功 +' + cfg.gradeDelta.great + '。',
-      '籤是權重，每一鎚獨立抽，籤不會用掉。破壞籤 = 等級 × ' + cfg.breakTicketsPerGrade + '，每升一級就多，永不封頂。',
-      '收起：把這把武器的等級記入本局，換一把 +0。本局分數 = 收起過的最高等級。碎掉的武器什麼都不算。',
+      '一局是連續回合。契約 ' + cfg.rounds.contract + ' 回合，之後無盡。上貢不足累計 ' + cfg.rounds.maxMisses + ' 次，局結束。分數 = 達標回合數。',
+      '每回合供 ' + cfg.rounds.supply + ' 把武器，鎚數不限。武器碎了就少一把。上貢：武器進貢品堆，拿下一把。貢品總值 ≥ 配額就達標。',
+      '武器價值 = ' + cfg.value.base + ' × ' + cfg.value.perGrade + '^等級。上貢的價值全額變金幣。配額每回合 ×' + cfg.quota.growth + '。',
+      '每回合開始的商店：遺物用劍幣買、重抽用金幣（越抽越貴）、商人賣武器用金幣（每回合 ' + cfg.merchant.swordStock + ' 把，越買越貴）。',
+      '劍幣來源：回合結束沒用完的武器、商店裡投入武器、鍛造時把沒敲過的武器投入。遺物格 ' + cfg.relicSlots + ' 個，護盾位 ' + cfg.shieldSlots + ' 個。',
+      '五種結果：破壞（失去武器）、損傷 ' + cfg.gradeDelta.damage + '、維持 0、成功 +' + cfg.gradeDelta.success + '、大成功 +' + cfg.gradeDelta.great + '。籤是權重，每一鎚獨立抽。破壞籤 = 等級 × ' + cfg.breakTicketsPerGrade + '，永不封頂。',
       '入神：每一次普通鎚擊充能 +1，滿 ' + f.threshold + ' 進入入神 ' + f.strikes + ' 鎚，期間破壞籤 0。結束後這把武器永久 +' + f.scar + ' 張破壞籤。',
-      '遺物：開局三選一，本局首次到達 ' + cfg.milestones.map(m => '+' + m).join('、') + ' 各三選一。格子 ' + cfg.relicSlots + ' 個，護盾位 ' + cfg.shieldSlots + ' 個。',
-      '鍵盤：空白鍵／Enter 敲，S 收起。',
+      '鍵盤：空白鍵／Enter 敲，S 上貢。',
     ].map(x => '<li>' + x + '</li>').join('');
   }
 
@@ -330,33 +430,46 @@
   function doStrike() {
     const r = E.strike(s);
     if (!r) return;
-    lastResult = r;
-    const el = $('weapon');
-    if (r.broke) { el.classList.remove('broke'); void el.offsetWidth; el.classList.add('broke'); }
+    if (r.broke) { const el = $('weapon'); el.classList.remove('broke'); void el.offsetWidth; el.classList.add('broke'); }
     render();
   }
-  function doShelve() { if (E.shelve(s)) render(); }
-  function doEnd() { if (!s.ended && confirm('結束這一局？鐵砧上的武器會自動收起。')) { E.endRun(s); render(); } }
+  function doDeliver() { if (E.deliver(s)) render(); }
+  function doSettle() { if (s.phase === 'forge' && confirm('收工？鐵砧上有等級的武器會上貢，沒敲過的換劍幣，剩下的武器全變劍幣。')) { E.settleEarly(s); render(); } }
   function newGame() { s = E.newRun(cfg); pendingPick = null; render(); }
 
   $('btnStrike').onclick = doStrike;
-  $('btnShelve').onclick = doShelve;
-  $('btnEnd').onclick = doEnd;
+  $('btnDeliver').onclick = doDeliver;
+  $('btnSettle').onclick = doSettle;
+  $('btnDepositCur').onclick = () => { if (E.depositCurrent(s)) render(); };
+  $('btnStart').onclick = () => { if (E.startForging(s).ok) render(); };
+  $('btnReroll').onclick = () => { E.reroll(s); render(); };
+  $('btnBuySword').onclick = () => { E.buySword(s); render(); };
+  $('btnDeposit').onclick = () => { E.depositSword(s); render(); };
+  $('shopOffers').addEventListener('click', ev => {
+    const b = ev.target.closest('button[data-buy]'); if (!b) return;
+    const i = +b.dataset.buy; const r = E.buyRelic(s, i);
+    if (!r.ok && r.needReplace) { pendingPick = { kind: 'shop', index: i }; }
+    render();
+  });
   $('offerSheet').addEventListener('click', ev => {
-    const b = ev.target.closest('button'); if (!b || !s.offer) return;
+    const b = ev.target.closest('button'); if (!b) return;
     if (b.dataset.skip) { E.chooseOffer(s, null); render(); return; }
     if (b.dataset.back) { pendingPick = null; render(); return; }
     if (b.dataset.pick != null) {
       const i = +b.dataset.pick; const r = E.chooseOffer(s, i);
-      if (!r.ok && r.needReplace) { pendingPick = i; render(); return; }
+      if (!r.ok && r.needReplace) pendingPick = { kind: 'starter', index: i };
       render(); return;
     }
-    if (b.dataset.drop) { E.chooseOffer(s, pendingPick, b.dataset.drop); pendingPick = null; render(); }
+    if (b.dataset.drop && pendingPick) {
+      if (pendingPick.kind === 'starter') E.chooseOffer(s, pendingPick.index, b.dataset.drop);
+      else E.buyRelic(s, pendingPick.index, b.dataset.drop);
+      pendingPick = null; render();
+    }
   });
   document.addEventListener('keydown', ev => {
-    if (ev.repeat) return;
-    if (ev.code === 'Space' || ev.code === 'Enter') { if (!s.offer && !s.ended) { ev.preventDefault(); doStrike(); } }
-    else if (ev.key === 's' || ev.key === 'S') { if (!$('btnShelve').disabled) doShelve(); }
+    if (ev.repeat || s.phase !== 'forge' || s.offer || pendingPick) return;
+    if (ev.code === 'Space' || ev.code === 'Enter') { ev.preventDefault(); doStrike(); }
+    else if (ev.key === 's' || ev.key === 'S') { if (!$('btnDeliver').disabled) doDeliver(); }
   });
 
   renderRules();
